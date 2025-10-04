@@ -1,0 +1,50 @@
+name: keymatch
+description: KeyMatch - A dating app for more specific matches. Find meaningful connections through intelligent matching and detailed profiles.
+
+publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.2
+  http: ^1.1.0
+  shared_preferences: ^2.2.2  # Re-enabled for token storage
+  flutter_secure_storage: ^9.0.0 # For secure token storage
+  
+  image_picker: any  # Re-enabled for profile picture selection
+  path: ^1.8.3
+  provider: ^6.1.1
+  # Local notifications for background messages
+  flutter_local_notifications: ^19.3.0
+  # WebSocket for real-time messaging
+  socket_io_client: ^3.1.2
+  flutter_launcher_icons: ^0.14.4
+  # Google Play Billing for in-app purchases
+  in_app_purchase: ^3.1.13
+  # iOS StoreKit for Apple In-App Purchases
+  in_app_purchase_storekit: ^0.4.0
+  # GPS location functionality
+  geolocator: ^10.0.0  # Re-enabled for GPS functionality
+  permission_handler: ^12.0.0+1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  mockito: ^5.4.2
+  build_runner: 2.4.13
+
+flutter:
+  uses-material-design: true
+
+flutter_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/logo.png"
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/images/logo.png"

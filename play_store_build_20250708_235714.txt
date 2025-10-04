@@ -1,0 +1,15 @@
+Play Store AAB Build Summary
+============================
+Build Date: tis  8 jul 2025 23:59:04 CEST
+Version: 134.3.18+156
+File: keymatch_v134.3.18+156_20250708_235714.aab
+Size: 57M
+Location: build/app/outputs/bundle/release/keymatch_v134.3.18+156_20250708_235714.aab
+
+Next Steps:
+1. Upload keymatch_v134.3.18+156_20250708_235714.aab to Google Play Console
+2. Test the AAB on internal testing track
+3. Submit for review when ready
+
+IMPORTANT: Make sure you're using the correct keystore that matches
+the fingerprint expected by Google Play Console.

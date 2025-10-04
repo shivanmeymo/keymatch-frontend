@@ -1,0 +1,60 @@
+name: key_match
+description: Key Match - A match making app for specific matches. Find connections through intelligent matching and profiles.
+
+publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+
+version: 134.7.1+185
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.2
+  http: ^1.1.0
+  shared_preferences: ^2.2.2  # Re-enabled for token storage
+  # flutter_secure_storage: ^8.0.0  # Temporarily disabled for CI/CD compatibility
+  
+  image_picker: ^1.0.7  # Re-enabled for profile picture selection
+  path: ^1.8.3
+  provider: ^6.1.1
+  # Local notifications for background messages
+  flutter_local_notifications: ^19.3.0
+  # WebSocket for real-time messaging
+  socket_io_client: ^3.1.2
+  flutter_launcher_icons: ^0.14.4
+  # Google Play Billing for in-app purchases
+  in_app_purchase: ^3.1.13
+  # iOS StoreKit for Apple In-App Purchases
+  in_app_purchase_storekit: ^0.4.0
+  # GPS location functionality
+  geolocator: ^14.0.1  # Re-enabled for GPS functionality
+  permission_handler: ^12.0.0+1
+  reorderable_grid_view: ^2.2.8
+  # Package info for distribution detection
+  package_info_plus: ^8.0.2
+  # Payment processing
+  flutter_stripe: ^10.2.0
+  # QR code generation for Bitcoin payments
+  qr_flutter: ^4.1.0
+  # URL launcher for Bitcoin wallet integration
+  url_launcher: ^6.2.4
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  mockito: ^5.4.4
+  build_runner: ^2.5.4
+  analyzer: ^7.5.2
+
+flutter:
+  uses-material-design: true
+
+flutter_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/Key-match-icon-key.jpg"
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/images/Key-match-icon-key.jpg"
