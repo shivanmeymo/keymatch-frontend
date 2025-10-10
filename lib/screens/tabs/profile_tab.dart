@@ -382,7 +382,16 @@ class _ProfileTabState extends State<ProfileTab> {
             images[i]['isPrimary'] = (i == 0);
           }
           _userProfile!['images'] = images; // Update the local state as well for UI consistency
-          await ProfileService.updateImageOrder(images);
+          
+          // Transform images to the format backend expects: { imageId, order }
+          final imageOrders = images.asMap().entries.map((entry) {
+            return {
+              'imageId': entry.value['id'],
+              'order': entry.key,
+            };
+          }).toList();
+          
+          await ProfileService.updateImageOrder(imageOrders);
         }
       }
 
@@ -1189,7 +1198,15 @@ class _ProfileTabState extends State<ProfileTab> {
   // Update image order on the backend
   Future<void> _updateImageOrder(List reorderableImages) async {
     try {
-      await ProfileService.updateImageOrder(List<Map<String, dynamic>>.from(reorderableImages.cast<Map<String, dynamic>>()));
+      // Transform images to the format backend expects: { imageId, order }
+      final imageOrders = reorderableImages.asMap().entries.map((entry) {
+        return {
+          'imageId': entry.value['id'],
+          'order': entry.key,
+        };
+      }).toList();
+      
+      await ProfileService.updateImageOrder(imageOrders);
     } catch (error) {
       // Show error message to user
       if (mounted) {

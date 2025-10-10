@@ -1,12 +1,12 @@
 class ApiConfig {
-  // Backend URL - Update this when migrating to different hosting
-  static const String baseUrl = 'https://key-match-backend-nsx5nsymuq-uc.a.run.app';
+  // Backend URL - Bahnhof VPS
+  static const String baseUrl = 'http://158.174.211.155';
   
   // API endpoints - Include /api prefix for backend routes
   static const String apiBaseUrl = '$baseUrl/api';
   
   // WebSocket URL for real-time features
-  static const String webSocketUrl = 'wss://key-match-backend-nsx5nsymuq-uc.a.run.app';
+  static const String webSocketUrl = 'ws://158.174.211.155';
   
   // Image uploads URL
   static const String uploadsUrl = '$baseUrl/uploads';

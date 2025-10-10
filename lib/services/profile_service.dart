@@ -171,7 +171,7 @@ class ProfileService {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
-        body: json.encode({ 'images': images }),
+        body: json.encode({ 'imageOrders': images }),
       );
 
       if (response.statusCode != 200) {
@@ -274,7 +274,7 @@ class ProfileService {
       final streamedResponse = await request.send();
       final response = await http.Response.fromStream(streamedResponse);
 
-      if (response.statusCode == 200) {
+      if (response.statusCode == 200 || response.statusCode == 201) {
         final data = json.decode(response.body);
         
         // Transform image URLs to full URLs

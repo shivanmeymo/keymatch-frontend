@@ -57,5 +57,12 @@
 	<string>This app needs location access to find matches near you and update your location.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>This app needs location access to find matches near you and update your location.</string>
+	
+	<!-- Allow HTTP connections for development/VPS -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
 </dict>
 </plist>

@@ -207,8 +207,31 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     }
   }
 
+  Future<int> _getExistingImagesCount() async {
+    try {
+      final profile = await ProfileService.getProfile();
+      if (profile != null && profile['images'] != null) {
+        final images = profile['images'] as List;
+        print('User has ${images.length} existing images');
+        return images.length;
+      }
+      return 0;
+    } catch (e) {
+      print('Error checking existing images: $e');
+      return 0;
+    }
+  }
+
   Future<void> _handleUploadAndContinue() async {
-    if (!_validateForm()) {
+    // Check how many images user already has
+    final existingImagesCount = await _getExistingImagesCount();
+    final hasExistingImages = existingImagesCount > 0;
+    final hasMaxImages = existingImagesCount >= 6;
+    
+    print('User has $existingImagesCount existing images');
+    
+    // Validate form - don't require image if user already has images
+    if (!_validateForm(requireImage: !hasExistingImages)) {
       return;
     }
 
@@ -218,24 +241,31 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     });
 
     try {
-      print('Starting upload with image path: $_imagePath');
-      final response = await ProfileService.uploadProfilePicture(_imagePath!);
-      print('Upload response: $response');
+      Map<String, dynamic>? response;
       
-      if (response['images'] != null && response['images'].isNotEmpty) {
-        print('Upload successful, updating profile...');
-        
-        try {
-          final user = await AuthService.getCurrentUser();
-          final profileData = {
-            'bio': user?['bio'] ?? '',
-            'birthDate': _selectedDate != null ? _formatDateForAPI(_selectedDate!) : '',
-            'gender': _selectedGender,
-            'genderPreference': user?['gender_preference'] ?? 'B',
-            'relationshipType': user?['relationship_type'] ?? 'C',
-            'locationMode': _selectedLocationMode,
-            'images': response['images'],
-          };
+      // Only upload image if user selected one AND doesn't have max images
+      if (_imagePath != null && !hasMaxImages) {
+        print('Starting upload with image path: $_imagePath');
+        response = await ProfileService.uploadProfilePicture(_imagePath!);
+        print('Upload response: $response');
+      } else if (_imagePath != null && hasMaxImages) {
+        print('Skipping image upload - user already has maximum of 6 images');
+      } else {
+        print('Skipping image upload - no image selected');
+      }
+      
+      print('Updating profile...');
+      
+      try {
+        final user = await AuthService.getCurrentUser();
+        final profileData = {
+          'bio': user?['bio'] ?? '',
+          'birthDate': _selectedDate != null ? _formatDateForAPI(_selectedDate!) : '',
+          'gender': _selectedGender,
+          'genderPreference': user?['gender_preference'] ?? 'B',
+          'relationshipType': user?['relationship_type'] ?? 'C',
+          'locationMode': _selectedLocationMode,
+        };
           
           print('=== DEBUG: Profile setup - updating profile with data ===');
           print('Bio: ${profileData['bio']}');
@@ -243,7 +273,6 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           print('GenderPreference: ${profileData['genderPreference']}');
           print('RelationshipType: ${profileData['relationshipType']}');
           print('LocationMode: ${profileData['locationMode']}');
-          print('Images: ${profileData['images']}');
           
           await ProfileService.updateProfile(
             bio: profileData['bio']!.isEmpty ? null : profileData['bio'],
@@ -252,7 +281,6 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             genderPreference: profileData['genderPreference']!,
             relationshipType: [profileData['relationshipType']!],
             locationMode: profileData['locationMode']!,
-            images: profileData['images'],
           );
           print('Profile updated successfully');
           
@@ -288,9 +316,6 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             }
           }
         }
-      } else {
-        throw Exception('Failed to upload profile picture - no image URL received');
-      }
     } catch (error) {
       print('Error in handleUploadAndContinue: $error');
       setState(() {
@@ -441,8 +466,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     return "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
   }
 
-  bool _validateForm() {
-    if (_imagePath == null) {
+  bool _validateForm({bool requireImage = true}) {
+    if (requireImage && _imagePath == null) {
       _showErrorDialog('Please select a profile picture');
       return false;
     }
@@ -583,6 +608,15 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                             ],
                           ),
                   ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Profile picture is optional if you already have images',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.black45,
+                  ),
+                  textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 40),
                 

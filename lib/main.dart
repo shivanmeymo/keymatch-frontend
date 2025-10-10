@@ -238,16 +238,16 @@ class _SplashScreenState extends State<SplashScreen> {
     try {
       print('=== DEBUG: App initialization started ===');
       
-      // Check network connectivity first
-      try {
-        final result = await http.get(Uri.parse('https://www.google.com'));
-        if (result.statusCode == 200) {
-          print('Network connectivity: OK');
-        }
-      } catch (e) {
-        print('Network connectivity: FAILED - $e');
-        // Continue anyway, but this might explain backend issues
-      }
+      // Check network connectivity first (disabled - not needed for VPS backend)
+      // try {
+      //   final result = await http.get(Uri.parse('https://www.google.com'));
+      //   if (result.statusCode == 200) {
+      //     print('Network connectivity: OK');
+      //   }
+      // } catch (e) {
+      //   print('Network connectivity: FAILED - $e');
+      //   // Continue anyway, but this might explain backend issues
+      // }
       
       // Initialize authentication system with shorter timeout
       final hasValidSession = await AuthService.initialize()
