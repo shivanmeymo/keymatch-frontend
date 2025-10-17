@@ -182,12 +182,18 @@ class PremiumService {
       
       if (feature == null) return false;
       
+      // Premium users have unlimited access to all features
+      if (isPremiumUser) {
+        print('✅ Premium user - feature $featureKey is available (unlimited)');
+        return true;
+      }
+      
       // If it's premium only and user is not premium
       if (feature['premium_only'] == true && !isPremiumUser) {
         return false;
       }
       
-      // If it has a free limit, check usage
+      // For non-premium users, check if feature has a free limit
       if (feature['free_limit'] != null) {
         return await _checkFreeFeatureUsage(featureKey, feature);
       }

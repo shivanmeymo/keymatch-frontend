@@ -159,7 +159,9 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
             
             // Message
             Text(
-              'Enter the reset token from your email and create a new password.',
+              widget.token != null 
+                ? 'Create a new password for your account.'
+                : 'Enter the reset token from your email and create a new password.',
               style: TextStyle(
                 fontSize: 16,
                 color: AppColors.textSecondaryLight,
@@ -169,39 +171,66 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
             
             const SizedBox(height: 32),
             
-            // Token field
-            TextFormField(
-              controller: _tokenController,
-              enabled: !_isLoading && !_passwordReset,
-              decoration: InputDecoration(
-                labelText: 'Reset Token',
-                hintText: 'Enter the token from your email',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: AppColors.primaryGreenLightest),
+            // Token field (only show if token not provided via URL)
+            if (widget.token == null) ...[
+              TextFormField(
+                controller: _tokenController,
+                enabled: !_isLoading && !_passwordReset,
+                decoration: InputDecoration(
+                  labelText: 'Reset Token',
+                  hintText: 'Enter the token from your email',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: AppColors.primaryGreenLightest),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: AppColors.primaryGreenLightest),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: AppColors.primaryGreen, width: 2),
+                  ),
+                  filled: true,
+                  fillColor: Colors.white,
+                  prefixIcon: Icon(Icons.security, color: AppColors.primaryGreen),
+                  labelStyle: TextStyle(color: AppColors.textSecondaryLight),
+                  hintStyle: TextStyle(color: AppColors.textSecondaryLight.withOpacity(0.7)),
                 ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: AppColors.primaryGreenLightest),
+                style: TextStyle(
+                  color: AppColors.textPrimaryLight,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
                 ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: AppColors.primaryGreen, width: 2),
-                ),
-                filled: true,
-                fillColor: Colors.white,
-                prefixIcon: Icon(Icons.security, color: AppColors.primaryGreen),
-                labelStyle: TextStyle(color: AppColors.textSecondaryLight),
-                hintStyle: TextStyle(color: AppColors.textSecondaryLight.withOpacity(0.7)),
               ),
-              style: TextStyle(
-                color: AppColors.textPrimaryLight,
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
+              const SizedBox(height: 16),
+            ] else ...[
+              // Show token is pre-filled
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.green.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.green.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.check_circle, color: Colors.green, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Reset token verified from email link',
+                        style: TextStyle(
+                          color: Colors.green.shade700,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
+            ],
             
             // New password field
             TextFormField(

@@ -3,6 +3,7 @@ plugins {
     id "kotlin-android"
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id "dev.flutter.flutter-gradle-plugin"
+    id "com.google.gms.google-services"
 }
 
 // Load keystore properties from key.properties file
@@ -35,8 +36,8 @@ android {
         // For more information, see: https://docs.flutter.dev/deployment/android#reviewing-the-gradle-build-configuration.
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode = 187
-        versionName = "134.7.1"
+        versionCode = 203
+        versionName = "134.8.0"
     }
 
     signingConfigs {
@@ -85,18 +86,6 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
-
-    flavorDimensions "distribution"
-    productFlavors {
-        playstore {
-            dimension "distribution"
-            applicationId "com.keymatch.app"
-        }
-        fdroid {
-            dimension "distribution"
-            applicationId "com.keymatch.app.fdroid"
-        }
-    }
 }
 
 flutter {
@@ -111,4 +100,6 @@ dependencies {
     implementation 'com.google.errorprone:error_prone_annotations:2.11.0'
     // Add Material Design support for Stripe compatibility
     implementation 'com.google.android.material:material:1.11.0'
+    // Firebase Cloud Messaging
+    implementation 'com.google.firebase:firebase-messaging:23.4.1'
 }

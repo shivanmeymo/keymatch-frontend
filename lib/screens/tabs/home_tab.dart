@@ -213,26 +213,6 @@ class _HomeTabState extends State<HomeTab> {
     }
   }
 
-  Future<void> _testProfilePictureUrl() async {
-    print('🔍 Testing profile picture URL...');
-    if (_userProfilePicture != null) {
-      print('🔍 Current profile picture URL: $_userProfilePicture');
-      print('🔍 URL length: ${_userProfilePicture!.length}');
-      print('🔍 Is valid URL: ${_isValidUserImageUrl(_userProfilePicture)}');
-      
-      // Test if the URL is accessible
-      try {
-        final response = await http.head(Uri.parse(_userProfilePicture!));
-        print('🔍 URL response status: ${response.statusCode}');
-        print('🔍 URL response headers: ${response.headers}');
-      } catch (e) {
-        print('❌ Error testing URL: $e');
-      }
-    } else {
-      print('❌ No profile picture URL available');
-    }
-  }
-
   void _scrollToBottom() {
     if (_scrollController.hasClients) {
       _scrollController.animateTo(
@@ -288,8 +268,14 @@ class _HomeTabState extends State<HomeTab> {
 
       final response = await KeyMakerService.sendMessage(message);
       
+      print('📩 AI response received: $response');
+      print('📩 Response length: ${response.length}');
+      print('📩 Response type: ${response.runtimeType}');
+      
       // Extract keywords from AI response
       final extractedKeywords = KeyMakerService.extractKeywordsFromResponse(response);
+      print('📩 Extracted keywords result: $extractedKeywords');
+      print('📩 Extracted keywords length: ${extractedKeywords.length}');
       
       // Remove keyword tags from the response text for display
       String displayText = response;
@@ -365,27 +351,6 @@ class _HomeTabState extends State<HomeTab> {
         );
       }
     }
-  }
-
-  Future<void> _clearChat() async {
-    try {
-      await KeyMakerService.clearConversationHistory();
-      setState(() {
-        _messages.clear();
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Chat history cleared')),
-      );
-    } catch (error) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to clear chat: $error')),
-      );
-    }
-  }
-
-  Future<void> _sendTestMessage() async {
-    _inputController.text = "Show me some potential matches";
-    await _sendMessage();
   }
 
   // Helper function to extract suggested keywords from AI messages
@@ -543,39 +508,6 @@ class _HomeTabState extends State<HomeTab> {
         ),
         backgroundColor: AppColors.primaryGreen,
         elevation: 0,
-        actions: [
-          // Debug button to test profile loading
-          IconButton(
-            icon: const Icon(Icons.bug_report, color: Colors.white),
-            onPressed: () async {
-              print('🔍 Manual profile reload triggered');
-              await _loadUserProfile();
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Profile picture: $_userProfilePicture'),
-                  duration: const Duration(seconds: 3),
-                ),
-              );
-            },
-          ),
-          // Test profile picture URL
-          IconButton(
-            icon: const Icon(Icons.image, color: Colors.white),
-            onPressed: () async {
-              await _testProfilePictureUrl();
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Profile picture test completed'),
-                  duration: const Duration(seconds: 2),
-                ),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.clear, color: Colors.white),
-            onPressed: _clearChat,
-          ),
-        ],
       ),
       body: Column(
         children: [

@@ -22,11 +22,23 @@ import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:key_match/constants/api_config.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:firebase_core/firebase_core.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Initialize notifications
+  // Initialize Firebase
+  if (!kIsWeb) {
+    try {
+      await Firebase.initializeApp();
+      print('✅ Firebase initialized successfully');
+    } catch (e) {
+      print('❌ Firebase initialization error: $e');
+      // Continue without Firebase if it fails
+    }
+  }
+  
+  // Initialize notifications (includes FCM)
   await NotificationService.initialize();
   
   // Initialize unified payment service (handles both Play Store and F-Droid)
@@ -437,6 +449,13 @@ class _MainTabScreenState extends State<MainTabScreen> {
         ProfileTab(navigateToTab: _navigateToTab),
       ];
       print('=== DEBUG: MainTabScreen tabs initialized successfully ===');
+
+      // Register FCM token if not already registered (don't await - let it run in background)
+      NotificationService.registerFCMTokenAfterLogin().then((_) {
+        print('=== DEBUG: FCM token registration attempted ===');
+      }).catchError((e) {
+        print('=== DEBUG: FCM token registration failed: $e ===');
+      });
 
       // Initialize WebSocket connection for notifications
       NotificationService.initializeWebSocket();

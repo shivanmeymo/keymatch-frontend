@@ -173,14 +173,18 @@ class KeyMakerService {
   /// Extract keywords from AI response
   static List<String> extractKeywordsFromResponse(String response) {
     try {
-      print('🔍 Extracting keywords from response: ${response.substring(0, 100)}...');
+      print('🔍 Extracting keywords from FULL response: $response');
+      print('🔍 Response length: ${response.length}');
+      print('🔍 Response contains <keywords>: ${response.toLowerCase().contains('<keywords>')}');
       
       // Look for the special <keywords> tag
       final keywordTagPattern = RegExp(r'<keywords>(.*?)</keywords>', caseSensitive: false);
       final match = keywordTagPattern.firstMatch(response);
+      print('🔍 Regex match found: ${match != null}');
       
       if (match != null) {
         final keywordsText = match.group(1)?.trim();
+        print('🔍 Keywords text from match: "$keywordsText"');
         if (keywordsText != null) {
           final keywords = keywordsText
               .split(',')
@@ -188,8 +192,13 @@ class KeyMakerService {
               .where((keyword) => keyword.isNotEmpty)
               .toList();
           print('✅ Found keywords in tag: $keywords');
+          print('✅ Number of keywords: ${keywords.length}');
           return keywords;
+        } else {
+          print('❌ Keywords text is null');
         }
+      } else {
+        print('❌ No match found for <keywords> tag');
       }
       
       // Fallback: Look for keywords in the response using various patterns

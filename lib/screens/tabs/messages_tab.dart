@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/match_service.dart';
+import '../../services/profile_service.dart';
 import '../chat_screen.dart';
 import '../detailed_profile_screen.dart';
 import '../../constants/colors.dart';
@@ -81,7 +82,7 @@ class _MessagesTabState extends State<MessagesTab> {
   void _navigateToChat(Map<String, dynamic> match) {
     final profile = match['profile'];
     final userName = '${profile['user']['firstName']} ${profile['user']['lastName']}';
-    final userProfilePicture = profile['profilePicture'];
+    final userProfilePicture = ProfileService.getFullImageUrl(profile['profilePicture']);
     
     Navigator.push(
       context,
@@ -287,17 +288,15 @@ class _MessagesTabState extends State<MessagesTab> {
                             final profile = match['profile'];
                             final userName = '${profile['user']['firstName']} ${profile['user']['lastName']}';
                             
-                            // Debug profile picture
-                            final profilePicture = profile['profilePicture'];
-                            print('🔍 Profile picture for $userName: $profilePicture');
-                            print('🔍 Profile data: ${profile.toString()}');
-                            print('🔍 Match data: ${match.toString()}');
-                            
-                            // Test image URL accessibility
-                            if (profilePicture != null && profilePicture.isNotEmpty) {
-                              print('🔍 Testing image URL: $profilePicture');
-                              // You can add a simple network test here if needed
+                            // Get profile picture with full URL
+                            String? profilePictureUrl;
+                            if (profile['images'] != null && profile['images'].isNotEmpty) {
+                              profilePictureUrl = ProfileService.getFullImageUrl(profile['images'][0]['imageUrl']);
+                            } else if (profile['profilePicture'] != null) {
+                              profilePictureUrl = ProfileService.getFullImageUrl(profile['profilePicture']);
                             }
+                            
+                            print('🔍 Profile picture for $userName: $profilePictureUrl');
                             
                             // Handle lastMessage properly - it's an object, not a string
                             String lastMessageText = 'Start a conversation!';
@@ -333,10 +332,10 @@ class _MessagesTabState extends State<MessagesTab> {
                                       CircleAvatar(
                                         radius: 25,
                                         backgroundColor: Colors.grey[300],
-                                        backgroundImage: _isValidImageUrl(profilePicture)
-                                            ? NetworkImage(profilePicture)
+                                        backgroundImage: _isValidImageUrl(profilePictureUrl)
+                                            ? NetworkImage(profilePictureUrl!)
                                             : null,
-                                        child: !_isValidImageUrl(profilePicture)
+                                        child: !_isValidImageUrl(profilePictureUrl)
                                             ? const Icon(Icons.person, size: 25, color: Colors.grey)
                                             : null,
                                       ),

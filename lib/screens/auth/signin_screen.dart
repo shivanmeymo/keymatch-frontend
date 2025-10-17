@@ -3,6 +3,7 @@ import 'package:key_match/widgets/themed_view.dart';
 import 'package:key_match/widgets/themed_text.dart';
 import 'package:key_match/services/auth_service.dart';
 import 'package:key_match/services/profile_service.dart';
+import 'package:key_match/services/notification_service.dart';
 import 'package:key_match/constants/colors.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -56,6 +57,14 @@ class _SignInScreenState extends State<SignInScreen> {
             _showErrorDialog('Invalid response from server. Please try again.');
           }
           return;
+        }
+        
+        // Register FCM token after successful login
+        try {
+          await NotificationService.registerFCMTokenAfterLogin();
+        } catch (e) {
+          print('⚠️ Failed to register FCM token after login: $e');
+          // Don't block login if FCM registration fails
         }
         
         final isEmailVerified = user['emailVerified'] ?? false;

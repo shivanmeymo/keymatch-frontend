@@ -105,14 +105,6 @@ print_success "File: $AAB_NAME"
 print_success "Size: $AAB_SIZE"
 print_success "Location: build/app/outputs/bundle/release/$AAB_NAME"
 
-# Upload to Google Drive if rclone is configured
-if command -v rclone >/dev/null 2>&1 && rclone listremotes | grep -q "gdrive:"; then
-    print_status "Uploading to Google Drive..."
-    rclone mkdir gdrive:Key-Match/releases/android/ 2>/dev/null || true
-    rclone copy "build/app/outputs/bundle/release/$AAB_NAME" "gdrive:Key-Match/releases/android/"
-    print_success "AAB uploaded to Google Drive"
-fi
-
 # Generate build summary
 SUMMARY_FILE="play_store_build_${TIMESTAMP}.txt"
 cat > "$SUMMARY_FILE" << EOF

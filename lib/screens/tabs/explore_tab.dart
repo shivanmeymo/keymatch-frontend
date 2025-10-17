@@ -196,7 +196,10 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
                 actions: [
                   TextButton(
                     onPressed: () => Navigator.of(context).pop(false),
-                    child: const Text('Maybe Later'),
+                    child: const Text(
+                      'Maybe Later',
+                      style: TextStyle(color: Colors.white),
+                    ),
                   ),
                   ElevatedButton(
                     onPressed: () => Navigator.of(context).pop(true),

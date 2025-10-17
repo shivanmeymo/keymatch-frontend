@@ -1775,6 +1775,38 @@ class _ProfileTabState extends State<ProfileTab> {
           initialDate: selectedDate ?? eighteenYearsAgo,
           firstDate: hundredYearsAgo,
           lastDate: eighteenYearsAgo,
+          builder: (context, child) {
+            return Theme(
+              data: Theme.of(context).copyWith(
+                colorScheme: Theme.of(context).colorScheme.copyWith(
+                  primary: AppColors.primaryGreen, // Header and selected date background
+                  onPrimary: Colors.white, // Text on selected date (white on green)
+                  surface: Colors.white, // Calendar background
+                  onSurface: Colors.black87, // Calendar date numbers (dark for contrast)
+                  secondary: AppColors.primaryGreen, // Today's date color
+                  onSecondary: Colors.white, // Text on today's date
+                ),
+                textButtonTheme: TextButtonThemeData(
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.white, // White text on buttons
+                    backgroundColor: AppColors.primaryGreen, // Green background for buttons
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                ),
+                textTheme: Theme.of(context).textTheme.copyWith(
+                  bodyLarge: const TextStyle(color: Colors.black87), // Calendar body text (days of week)
+                  bodyMedium: const TextStyle(color: Colors.black87), // Unselected date numbers
+                  titleMedium: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600), // FIXED: White text on selected green dates!
+                  labelLarge: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold), // Selected date in dialog
+                ),
+              ),
+              child: child!,
+            );
+          },
         );
         
         if (picked != null) {

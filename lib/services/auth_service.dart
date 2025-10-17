@@ -155,6 +155,11 @@ class AuthService {
     required String password,
   }) async {
     try {
+      print('=== DEBUG: AuthService.login attempt ===');
+      print('Base URL: $baseUrl');
+      print('Full URL: $baseUrl/auth/login');
+      print('Email: $email');
+      
       final response = await http.post(
         Uri.parse('$baseUrl/auth/login'),
         headers: {'Content-Type': 'application/json'},
@@ -162,13 +167,18 @@ class AuthService {
           'email': email,
           'password': password,
         }),
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw Exception('Request timed out after 30 seconds');
+        },
       );
 
       final body = json.decode(response.body);
       
       print('=== DEBUG: AuthService.login response ===');
-      print('Status code: \\${response.statusCode}');
-      print('Response body: \\${response.body}');
+      print('Status code: ${response.statusCode}');
+      print('Response body: ${response.body}');
 
       if (response.statusCode == 200) {
         // Save token and user data in SharedPreferences (for backward compatibility)
@@ -215,9 +225,14 @@ class AuthService {
         };
       }
     } catch (e) {
+      print('=== DEBUG: AuthService.login error ===');
+      print('Error type: ${e.runtimeType}');
+      print('Error message: $e');
+      print('Stack trace: ${StackTrace.current}');
+      
       return {
         'success': false,
-        'message': 'Network error. Please check your internet connection and try again.',
+        'message': 'Network error: $e. Please check your internet connection and try again.',
         'code': 'NETWORK_ERROR',
       };
     }

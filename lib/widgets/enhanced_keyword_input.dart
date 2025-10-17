@@ -23,6 +23,7 @@ class EnhancedKeywordInput extends StatefulWidget {
 
 class _EnhancedKeywordInputState extends State<EnhancedKeywordInput> {
   final TextEditingController _controller = TextEditingController();
+  TextEditingController? _autocompleteController; // Store reference to Autocomplete's controller
   List<String> _suggestions = [];
   List<String> _popularKeywords = [];
   bool _isLoadingSuggestions = false;
@@ -132,7 +133,11 @@ class _EnhancedKeywordInputState extends State<EnhancedKeywordInput> {
 
     final newKeywords = List<String>.from(widget.currentKeywords)..add(trimmedKeyword);
     widget.onKeywordsChanged(newKeywords);
+    
+    // Clear both controllers to ensure the input field is cleared
     _controller.clear();
+    _autocompleteController?.clear();
+    
     setState(() {
       _suggestions = [];
       _showSuggestions = false;
@@ -152,6 +157,9 @@ class _EnhancedKeywordInputState extends State<EnhancedKeywordInput> {
         // Keyword input field with auto-complete
         Autocomplete<String>(
           fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+            // Store reference to the Autocomplete's controller
+            _autocompleteController = controller;
+            
             return TextField(
               controller: controller,
               focusNode: focusNode,

@@ -1,8 +1,6 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
-
+// BACKUP - Production config for 158.174.210.28
 class ApiConfig {
   // Backend URL - Bahnhof VPS (nginx proxies port 80 to backend on 8080)
-  // For web, we use the IP address directly. For native apps, same IP.
   static const String baseUrl = 'http://158.174.210.28';
   
   // API endpoints - Include /api prefix for backend routes
@@ -29,3 +27,4 @@ class ApiConfig {
   // Stripe configuration
   static const String stripePublishableKey = 'pk_live_51Ri0VmDX8VApD7AKld7sIAOmzvSIV2RwpP95WhGZiovgJ7PjZrwQ5zC4U8AO2EUg7RNLoqLFPKw4esKQbwqfkYa200N7USCiCE';
 } 
+

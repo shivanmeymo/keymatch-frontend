@@ -99,6 +99,53 @@ class _DetailedProfileScreenState extends State<DetailedProfileScreen> {
 
     try {
       if (actionType == 'like') {
+        // Check if user can like (premium feature check)
+        final canLike = await PremiumService.isFeatureAvailable('unlimited_likes');
+        
+        if (!canLike) {
+          // Show premium upgrade dialog
+          if (mounted) {
+            final shouldUpgrade = await showDialog<bool>(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: const Text('Like Limit Reached'),
+                content: const Text(
+                  'You\'ve used all your free likes for today. Upgrade to Premium for unlimited likes!',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(false),
+                    child: const Text('Maybe Later'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () => Navigator.of(context).pop(true),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.greenAccent,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('Go Premium'),
+                  ),
+                ],
+              ),
+            );
+            
+            if (shouldUpgrade == true) {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const PremiumFeaturesScreen(),
+                ),
+              );
+            }
+          }
+          setState(() {
+            _actionLoading = false;
+          });
+          return;
+        }
+
+        // Use the feature (increment counter only for non-premium users)
+        await PremiumService.useFeature('unlimited_likes');
+        
         final response = await ProfileService.likeProfile(widget.profile['id'].toString());
         
         if (response['isMatch'] == true) {
@@ -548,11 +595,11 @@ class _DetailedProfileScreenState extends State<DetailedProfileScreen> {
                         return GestureDetector(
                           onTap: _actionLoading ? null : () => _handleAction('send_message'),
                           child: Container(
-                            width: 50,
-                            height: 50,
+                            width: 60,
+                            height: 60,
                             decoration: BoxDecoration(
-                              color: AppColors.greenAccent,
-                              borderRadius: BorderRadius.circular(25),
+                              color: Colors.amber[600],
+                              borderRadius: BorderRadius.circular(30),
                               boxShadow: [
                                 BoxShadow(
                                   color: Colors.black.withOpacity(0.3),
@@ -564,7 +611,7 @@ class _DetailedProfileScreenState extends State<DetailedProfileScreen> {
                             child: const Icon(
                               Icons.chat_bubble,
                               color: Colors.white,
-                              size: 24,
+                              size: 28,
                             ),
                           ),
                         );

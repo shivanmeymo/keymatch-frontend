@@ -453,6 +453,38 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       initialDate: _selectedDate ?? eighteenYearsAgo,
       firstDate: hundredYearsAgo, // 100 years ago
       lastDate: eighteenYearsAgo, // 18 years ago
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: Theme.of(context).colorScheme.copyWith(
+              primary: AppColors.primaryGreen, // Header and selected date background (Dark green #2E7D32 with 5.5:1 contrast)
+              onPrimary: Colors.white, // Text on selected date (white on green)
+              surface: Colors.white, // Calendar background
+              onSurface: Colors.black87, // Calendar date numbers (excellent contrast ~15:1)
+              secondary: AppColors.primaryGreen, // Today's date color
+              onSecondary: Colors.white, // Text on today's date (white on green)
+            ),
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.white, // White text on buttons
+                backgroundColor: AppColors.primaryGreen, // Green background for buttons
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+            ),
+            textTheme: Theme.of(context).textTheme.copyWith(
+              bodyLarge: const TextStyle(color: Colors.black87), // Calendar body text (days of week)
+              bodyMedium: const TextStyle(color: Colors.black87), // Unselected date numbers
+              titleMedium: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600), // FIXED: White text on selected green dates!
+              labelLarge: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold), // Selected date in dialog
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
     if (picked != null && picked != _selectedDate) {
       setState(() {
@@ -660,6 +692,13 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                                 });
                               },
                               contentPadding: EdgeInsets.zero,
+                              activeColor: AppColors.primaryGreen, // Green when selected
+                              fillColor: MaterialStateProperty.resolveWith<Color>((states) {
+                                if (states.contains(MaterialState.selected)) {
+                                  return AppColors.primaryGreen; // Green fill when selected
+                                }
+                                return Colors.grey.shade600; // Dark grey border when unselected (visible!)
+                              }),
                             ),
                           );
                         }).toList(),
@@ -767,6 +806,13 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                                 });
                               },
                               contentPadding: EdgeInsets.zero,
+                              activeColor: AppColors.primaryGreen, // Green when selected
+                              fillColor: MaterialStateProperty.resolveWith<Color>((states) {
+                                if (states.contains(MaterialState.selected)) {
+                                  return AppColors.primaryGreen; // Green fill when selected
+                                }
+                                return Colors.grey.shade600; // Dark grey border when unselected (visible!)
+                              }),
                             ),
                           );
                         }).toList(),

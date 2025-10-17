@@ -161,11 +161,20 @@ venv.bak/
 
 # Google Cloud
 google-services.json
+android/app/google-services.json
 GoogleService-Info.plist
 .gcloud-passwords.json
 .gcloud-connection.json
 service-account*.json
 *service-account*.json
+
+# Upload certificates and keystore credentials
+upload_certificate.pem
+android/upload_certificate.pem
+keystore-credentials.txt
+*keystore-credentials*
+setup-keystore-passwords.sh
+*setup-keystore-passwords*
 
 # Database
 *.db

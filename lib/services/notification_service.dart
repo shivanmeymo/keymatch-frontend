@@ -1,24 +1,42 @@
 import 'dart:convert';
+import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
+import 'package:permission_handler/permission_handler.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:http/http.dart' as http;
 import 'auth_service.dart';
 import '../constants/api_config.dart';
+
+// Top-level function for background message handler
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
+  print('🔔 Background message received: ${message.notification?.title}');
+  // Process background message
+  await NotificationService._handleRemoteMessage(message);
+}
 
 class NotificationService {
   static final FlutterLocalNotificationsPlugin _localNotifications =
       FlutterLocalNotificationsPlugin();
   static IO.Socket? _socket;
   static bool _isInitialized = false;
+  static FirebaseMessaging? _firebaseMessaging;
 
   // Use the centralized API configuration
   static String get _socketUrl => ApiConfig.webSocketUrl;
 
-  // Initialize local notifications
+  // Initialize local notifications and Firebase
   static Future<void> initialize() async {
     if (_isInitialized) return;
     
     try {
+      // Initialize Firebase
+      await _initializeFirebase();
+      
       // Initialize local notifications
       const AndroidInitializationSettings initializationSettingsAndroid =
           AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -41,18 +59,46 @@ class NotificationService {
         onDidReceiveNotificationResponse: _onNotificationTapped,
       );
 
-      // Request permissions on iOS
+      // Create Android notification channel
+      if (!kIsWeb && Platform.isAndroid) {
+        const AndroidNotificationChannel channel = AndroidNotificationChannel(
+          'keymatch_notifications',
+          'KeyMatch Notifications',
+          description: 'Notifications for matches and messages',
+          importance: Importance.high,
+          playSound: true,
+        );
+        await _localNotifications
+            .resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin>()
+            ?.createNotificationChannel(channel);
+      }
+
+      // Request permissions on iOS and Android 13+
       if (!kIsWeb) {
         try {
-          final status = await _localNotifications.resolvePlatformSpecificImplementation<
-              IOSFlutterLocalNotificationsPlugin>()?.requestPermissions(
-            alert: true,
-            badge: true,
-            sound: true,
-          );
-          print('📱 iOS notification permissions: $status');
+          // iOS permissions
+          if (Platform.isIOS) {
+            final status = await _localNotifications.resolvePlatformSpecificImplementation<
+                IOSFlutterLocalNotificationsPlugin>()?.requestPermissions(
+              alert: true,
+              badge: true,
+              sound: true,
+            );
+            print('📱 iOS notification permissions: $status');
+          }
+          
+          // Android 13+ (API 33+) permissions
+          if (Platform.isAndroid) {
+            final status = await Permission.notification.request();
+            print('📱 Android notification permission: $status');
+            
+            if (!status.isGranted) {
+              print('⚠️  Notification permission not granted');
+            }
+          }
         } catch (e) {
-          print('📱 iOS permission request failed: $e');
+          print('📱 Permission request failed: $e');
         }
       }
 
@@ -60,6 +106,144 @@ class NotificationService {
       print('✅ Local notifications initialized successfully');
     } catch (e) {
       print('❌ Error initializing notifications: $e');
+    }
+  }
+
+  // Initialize Firebase Cloud Messaging
+  static Future<void> _initializeFirebase() async {
+    try {
+      if (!kIsWeb) {
+        _firebaseMessaging = FirebaseMessaging.instance;
+
+        // Request permissions
+        NotificationSettings settings = await _firebaseMessaging!.requestPermission(
+          alert: true,
+          announcement: false,
+          badge: true,
+          carPlay: false,
+          criticalAlert: false,
+          provisional: false,
+          sound: true,
+        );
+
+        print('📱 FCM permission status: ${settings.authorizationStatus}');
+
+        if (settings.authorizationStatus == AuthorizationStatus.authorized) {
+          // Get FCM token
+          String? token = await _firebaseMessaging!.getToken();
+          if (token != null) {
+            print('🔑 FCM Token: $token');
+            await _registerFCMToken(token);
+          }
+
+          // Listen for token refresh
+          _firebaseMessaging!.onTokenRefresh.listen((newToken) {
+            print('🔄 FCM Token refreshed: $newToken');
+            _registerFCMToken(newToken);
+          });
+
+          // Handle foreground messages
+          FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+            print('🔔 Foreground message received: ${message.notification?.title}');
+            _handleRemoteMessage(message);
+          });
+
+          // Handle background messages
+          FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
+          // Handle when user taps notification
+          FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+            print('👆 Notification tapped: ${message.data}');
+            _handleNotificationNavigation(message.data);
+          });
+
+          print('✅ Firebase Cloud Messaging initialized');
+        }
+      }
+    } catch (e) {
+      print('❌ Error initializing Firebase: $e');
+    }
+  }
+
+  // Register FCM token with backend
+  static Future<void> _registerFCMToken(String token) async {
+    try {
+      final authToken = await AuthService.getToken();
+      if (authToken == null) {
+        print('⚠️  No auth token, cannot register FCM token');
+        return;
+      }
+
+      final response = await http.post(
+        Uri.parse('${ApiConfig.apiBaseUrl}/auth/update-fcm-token'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $authToken',
+        },
+        body: json.encode({'fcmToken': token}),
+      );
+
+      if (response.statusCode == 200) {
+        print('✅ FCM token registered with backend');
+      } else {
+        print('❌ Failed to register FCM token: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('❌ Error registering FCM token: $e');
+    }
+  }
+
+  // Re-register FCM token after login (public method)
+  static Future<void> registerFCMTokenAfterLogin() async {
+    try {
+      print('🔄 Attempting to register FCM token...');
+      
+      if (kIsWeb) {
+        print('⚠️  Web platform - FCM not supported');
+        return;
+      }
+      
+      if (_firebaseMessaging == null) {
+        print('❌ Firebase Messaging not initialized!');
+        print('   Trying to initialize Firebase now...');
+        await _initializeFirebase();
+      }
+      
+      if (_firebaseMessaging != null) {
+        print('✅ Firebase Messaging is initialized, requesting token...');
+        String? token = await _firebaseMessaging!.getToken();
+        
+        if (token != null) {
+          print('🔑 FCM Token obtained: ${token.substring(0, 20)}...');
+          await _registerFCMToken(token);
+          print('✅ FCM token registration request sent to backend');
+        } else {
+          print('❌ getToken() returned null!');
+          print('   Possible causes:');
+          print('   - Google Play Services not installed/updated');
+          print('   - Device not connected to internet');
+          print('   - Firebase project configuration issue');
+        }
+      } else {
+        print('❌ Firebase Messaging is still null after init attempt');
+      }
+    } catch (e) {
+      print('❌ Error re-registering FCM token: $e');
+      print('   Stack trace: ${e.toString()}');
+    }
+  }
+
+  // Handle remote FCM messages
+  static Future<void> _handleRemoteMessage(RemoteMessage message) async {
+    final notification = message.notification;
+    final data = message.data;
+
+    if (notification != null) {
+      await _showLocalNotification(
+        title: notification.title ?? 'KeyMatch',
+        body: notification.body ?? '',
+        payload: json.encode(data),
+      );
     }
   }
 
@@ -130,12 +314,10 @@ class NotificationService {
       final content = data['content'] ?? 'New message';
       final matchId = data['matchId']?.toString() ?? '';
 
-      print('📨 Showing notification for message from $senderName: $content');
-      showNewMessageNotification(
-        senderName: senderName,
-        messageContent: content,
-        matchId: matchId,
-      );
+      // Don't show WebSocket notification - FCM will handle it
+      // WebSocket is only for real-time updates when app is open
+      print('📨 Message received via WebSocket from $senderName: $content');
+      print('   (Notification handled by FCM, not showing duplicate)');
     }
   }
 
@@ -148,19 +330,11 @@ class NotificationService {
       
       print('💕 Match notification - isCurrentUser: $isCurrentUser, matchedUserName: $matchedUserName');
       
-      // Only show notification if it's not the current user who initiated the match
+      // Don't show WebSocket notification - FCM will handle it
+      // WebSocket is only for real-time updates when app is open
       if (!isCurrentUser) {
-        print('💕 Showing match notification for: $matchedUserName');
-        _showLocalNotification(
-          title: 'New Match! 🎉',
-          body: 'You matched with $matchedUserName! Start a conversation now.',
-          payload: json.encode({
-            'type': 'new_match',
-            'matchId': data['matchId']?.toString(),
-            'matchedUserId': data['matchedUserId']?.toString(),
-            'matchedUserName': matchedUserName,
-          }),
-        );
+        print('💕 Match received via WebSocket with $matchedUserName');
+        print('   (Notification handled by FCM, not showing duplicate)');
       } else {
         print('💕 Skipping match notification - current user initiated the match');
       }
