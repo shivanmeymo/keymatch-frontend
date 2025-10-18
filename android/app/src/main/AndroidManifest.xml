@@ -81,6 +81,13 @@
         <meta-data
             android:name="privacy_policy_url"
             android:value="https://klas96.github.io/keymatch-policy/privacy-policy.html" />
+        <!-- Firebase Cloud Messaging Configuration -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@mipmap/ic_launcher" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/notification_color" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
