@@ -3,7 +3,7 @@ description: Key Match - A match making app for specific matches. Find connectio
 
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 
-version: 134.8.0+204
+version: 134.9.0+206
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -27,6 +27,8 @@ dependencies:
   firebase_core: ^3.8.1
   firebase_messaging: ^15.1.5
   flutter_launcher_icons: ^0.14.4
+  # Google Sign-In
+  google_sign_in: ^6.2.1
   # Google Play Billing for in-app purchases
   in_app_purchase: ^3.1.13
   # iOS StoreKit for Apple In-App Purchases
@@ -45,6 +47,8 @@ dependencies:
   qr_flutter: ^4.1.0
   # URL launcher for Bitcoin wallet integration
   url_launcher: ^6.2.4
+  # Geocoding for address autocomplete
+  geocoding: ^3.0.0
 
 dev_dependencies:
   flutter_test:

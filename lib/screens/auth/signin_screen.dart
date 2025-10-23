@@ -29,6 +29,91 @@ class _SignInScreenState extends State<SignInScreen> {
     super.dispose();
   }
 
+  void _handleGoogleSignIn() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      print('Attempting Google Sign-In...');
+      
+      final result = await AuthService.signInWithGoogle();
+      
+      if (result['success'] == true) {
+        final user = result['user'];
+        
+        if (user == null) {
+          if (mounted) {
+            _showErrorDialog('Invalid response from server. Please try again.');
+          }
+          return;
+        }
+        
+        // Register FCM token after successful login
+        try {
+          await NotificationService.registerFCMTokenAfterLogin();
+        } catch (e) {
+          print('⚠️ Failed to register FCM token after login: $e');
+        }
+        
+        final isEmailVerified = user['emailVerified'] ?? true; // Google accounts are pre-verified
+        final isNewUser = result['isNewUser'] ?? false;
+        
+        if (!isEmailVerified) {
+          if (mounted) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => EmailVerificationScreen(
+                  email: user['email'] ?? '',
+                  firstName: user['firstName'] ?? '',
+                ),
+              ),
+            );
+          }
+          return;
+        }
+        
+        // Check if user has a complete profile
+        try {
+          final profile = await ProfileService.getCompleteProfile();
+          
+          if (profile != null && !isNewUser) {
+            if (mounted) {
+              Navigator.pushReplacementNamed(context, '/home');
+            }
+          } else {
+            if (mounted) {
+              Navigator.pushReplacementNamed(context, '/profile-setup');
+            }
+          }
+        } catch (e) {
+          print('Profile check error: $e');
+          if (mounted) {
+            Navigator.pushReplacementNamed(context, '/profile-setup');
+          }
+        }
+      } else {
+        // Handle error from AuthService
+        final errorMessage = result['message'] ?? 'Google Sign-In failed. Please try again.';
+        if (mounted && result['code'] != 'SIGN_IN_CANCELLED') {
+          _showErrorDialog(errorMessage);
+        }
+      }
+    } catch (error) {
+      print('Google Sign-In error: $error');
+      if (mounted) {
+        _showErrorDialog('Google Sign-In failed. Please try again.');
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
   void _handleSignIn() async {
     final email = _emailController.text.trim();
     final password = _passwordController.text;
@@ -315,6 +400,64 @@ class _SignInScreenState extends State<SignInScreen> {
                         'Sign In', 
                         style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                       ),
+              ),
+              const SizedBox(height: 20),
+              // Divider with "OR" text
+              Row(
+                children: [
+                  Expanded(
+                    child: Divider(
+                      color: AppColors.primaryGreenLightest,
+                      thickness: 1,
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: ThemedText(
+                      'OR',
+                      style: TextStyle(
+                        color: AppColors.textSecondaryLight,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Divider(
+                      color: AppColors.primaryGreenLightest,
+                      thickness: 1,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              // Google Sign-In Button
+              OutlinedButton.icon(
+                onPressed: _isLoading ? null : _handleGoogleSignIn,
+                style: OutlinedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: AppColors.textPrimaryLight,
+                  padding: const EdgeInsets.symmetric(vertical: 15),
+                  side: BorderSide(color: AppColors.primaryGreenLightest),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                icon: Image.network(
+                  'https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg',
+                  height: 24,
+                  width: 24,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Icon(Icons.g_mobiledata, size: 24, color: AppColors.primaryGreen);
+                  },
+                ),
+                label: ThemedText(
+                  'Continue with Google',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimaryLight,
+                  ),
+                ),
               ),
               const SizedBox(height: 20),
               TextButton(

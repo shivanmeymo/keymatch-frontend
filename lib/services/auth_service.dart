@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';  // Re-enabled for 
 import 'package:flutter/foundation.dart';
 import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:google_sign_in/google_sign_in.dart';
 import 'session_manager.dart';
 import '../constants/api_config.dart';
 
@@ -234,6 +235,115 @@ class AuthService {
         'success': false,
         'message': 'Network error: $e. Please check your internet connection and try again.',
         'code': 'NETWORK_ERROR',
+      };
+    }
+  }
+
+  // Google Sign-In
+  static Future<Map<String, dynamic>> signInWithGoogle() async {
+    try {
+      print('=== DEBUG: AuthService.signInWithGoogle attempt ===');
+      
+      // Initialize Google Sign-In
+      // Note: On Android, clientId is not needed as it's read from google-services.json
+      // On iOS/Web, you can conditionally add clientId using Platform.isIOS
+      final GoogleSignIn googleSignIn = GoogleSignIn(
+        scopes: ['email', 'profile'],
+      );
+
+      // Sign out first to ensure account picker shows
+      await googleSignIn.signOut();
+      
+      // Trigger the Google Sign-In flow
+      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+      
+      if (googleUser == null) {
+        // User cancelled the sign-in
+        return {
+          'success': false,
+          'message': 'Google Sign-In cancelled',
+          'code': 'SIGN_IN_CANCELLED',
+        };
+      }
+
+      // Obtain the auth details from the request
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      
+      print('Google Sign-In successful for: ${googleUser.email}');
+      print('ID Token: ${googleAuth.idToken != null ? "Present" : "Missing"}');
+      
+      // Send the ID token to your backend
+      final response = await http.post(
+        Uri.parse('$baseUrl/auth/google-login'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'idToken': googleAuth.idToken,
+          'email': googleUser.email,
+          'displayName': googleUser.displayName,
+          'photoUrl': googleUser.photoUrl,
+        }),
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw Exception('Request timed out after 30 seconds');
+        },
+      );
+
+      final body = json.decode(response.body);
+      
+      print('=== DEBUG: Google login response ===');
+      print('Status code: ${response.statusCode}');
+      print('Response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        // Save token and user data
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(tokenKey, body['token']);
+        await prefs.setString(userKey, json.encode(body['user']));
+        
+        // Store the session in SessionManager
+        await SessionManager.storeSession(
+          token: body['token'],
+          userData: body['user'],
+        );
+
+        // Save premium status
+        if (body['user'] != null) {
+          final isPremium = body['user']['isPremium'] == true;
+          final premiumExpiry = body['user']['premiumExpiry'];
+          await prefs.setBool('premium_status', isPremium);
+          if (premiumExpiry != null) {
+            await prefs.setString('premium_expiry', premiumExpiry);
+          } else {
+            await prefs.remove('premium_expiry');
+          }
+        }
+
+        return {
+          'success': true,
+          'message': 'Google Sign-In successful!',
+          'user': body['user'],
+          'token': body['token'],
+          'isNewUser': body['isNewUser'] ?? false,
+        };
+      } else {
+        String errorMessage = _handleApiError(response);
+        
+        return {
+          'success': false,
+          'message': errorMessage,
+          'code': body['code'],
+        };
+      }
+    } catch (e) {
+      print('=== DEBUG: AuthService.signInWithGoogle error ===');
+      print('Error type: ${e.runtimeType}');
+      print('Error message: $e');
+      
+      return {
+        'success': false,
+        'message': 'Google Sign-In error: $e',
+        'code': 'GOOGLE_SIGN_IN_ERROR',
       };
     }
   }

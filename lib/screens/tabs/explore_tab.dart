@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:key_match/services/profile_service.dart';
 import 'package:key_match/services/auth_service.dart';
 import 'package:key_match/services/premium_service.dart';
+import 'package:key_match/services/event_service.dart';
+import 'package:key_match/services/location_service.dart';
 import 'package:key_match/screens/detailed_profile_screen.dart';
 import 'package:key_match/screens/premium_features_screen.dart';
 import 'package:flutter/foundation.dart';
@@ -25,6 +27,7 @@ class ExploreTab extends StatefulWidget {
 
 class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
   List<Map<String, dynamic>> _potentialMatches = [];
+  List<Map<String, dynamic>> _events = [];
   Map<String, dynamic>? _userProfile;
   Map<String, dynamic>? _suggestion;
   bool _isLoading = true;
@@ -34,6 +37,8 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
   // --- Animation state ---
   String _lastAction = 'none'; // 'like', 'dislike', or 'none'
   bool _showActionOverlay = false;
+  // --- View mode state ---
+  String _viewMode = 'solo'; // 'solo', 'group', or 'event'
 
   @override
   void initState() {
@@ -67,41 +72,60 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
       // Load user profile
       final profile = await ProfileService.getProfile();
       
-      // Load potential matches, passing gender preference if available
-      final matchesResponse = await ProfileService.getPotentialMatches(
-        genderPreference: profile?['genderPreference'],
-      );
+      if (_viewMode == 'event') {
+        // Load events
+        final eventsResponse = await EventService.getEvents(
+          status: 'upcoming',
+          sortBy: 'distance',
+        );
 
-      if (mounted) {
-        setState(() {
-          _userProfile = profile;
-          
-          // Safely convert profiles data
-          final profilesData = matchesResponse['profiles'];
-          print('🔍 Explore tab - matchesResponse type: ${matchesResponse.runtimeType}');
-          print('🔍 Explore tab - profilesData type: ${profilesData.runtimeType}');
-          print('🔍 Explore tab - profilesData: $profilesData');
-          
-          if (profilesData is List) {
-            _potentialMatches = profilesData.map((profile) {
-              if (profile is Map<String, dynamic>) {
-                return profile;
-              } else {
-                print('⚠️ Warning: Profile data is not Map<String, dynamic>: $profile');
-                print('⚠️ Profile type: ${profile.runtimeType}');
-                return <String, dynamic>{};
-              }
-            }).toList();
-          } else {
-            print('⚠️ Warning: profiles data is not a List: $profilesData');
-            _potentialMatches = [];
-          }
-          
-          print('🔍 Explore tab - _potentialMatches length: ${_potentialMatches.length}');
-          _suggestion = matchesResponse['suggestion'];
-          _isLoading = false;
-          _currentIndex = 0;
-        });
+        if (mounted) {
+          setState(() {
+            _userProfile = profile;
+            _events = eventsResponse['success'] == true 
+                ? List<Map<String, dynamic>>.from(eventsResponse['events'] ?? [])
+                : [];
+            _isLoading = false;
+            _currentIndex = 0;
+          });
+        }
+      } else {
+        // Load potential matches for solo/group mode
+        final matchesResponse = await ProfileService.getPotentialMatches(
+          genderPreference: profile?['genderPreference'],
+        );
+
+        if (mounted) {
+          setState(() {
+            _userProfile = profile;
+            
+            // Safely convert profiles data
+            final profilesData = matchesResponse['profiles'];
+            print('🔍 Explore tab - matchesResponse type: ${matchesResponse.runtimeType}');
+            print('🔍 Explore tab - profilesData type: ${profilesData.runtimeType}');
+            print('🔍 Explore tab - profilesData: $profilesData');
+            
+            if (profilesData is List) {
+              _potentialMatches = profilesData.map((profile) {
+                if (profile is Map<String, dynamic>) {
+                  return profile;
+                } else {
+                  print('⚠️ Warning: Profile data is not Map<String, dynamic>: $profile');
+                  print('⚠️ Profile type: ${profile.runtimeType}');
+                  return <String, dynamic>{};
+                }
+              }).toList();
+            } else {
+              print('⚠️ Warning: profiles data is not a List: $profilesData');
+              _potentialMatches = [];
+            }
+            
+            print('🔍 Explore tab - _potentialMatches length: ${_potentialMatches.length}');
+            _suggestion = matchesResponse['suggestion'];
+            _isLoading = false;
+            _currentIndex = 0;
+          });
+        }
       }
     } catch (error) {
       if (mounted) {
@@ -504,6 +528,1006 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
     return typeList.map((type) => _getRelationshipTypeText(type)).join(', ');
   }
 
+  Widget _buildEventsList() {
+    return RefreshIndicator(
+      onRefresh: _loadData,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: _events.length,
+        itemBuilder: (context, index) {
+          final event = _events[index];
+          final creator = event['creator'];
+          final eventDate = event['eventDate'] != null 
+              ? DateTime.parse(event['eventDate'])
+              : null;
+          final distance = event['distance'];
+          final participantCount = event['currentParticipants'] ?? 0;
+          final maxParticipants = event['maxParticipants'];
+          final userStatus = event['userStatus'];
+          
+          return Card(
+            margin: const EdgeInsets.only(bottom: 16),
+            elevation: 2,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: InkWell(
+              onTap: () {
+                // TODO: Navigate to event details screen
+                _showEventDetailsDialog(event);
+              },
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      AppColors.primaryGreen,
+                      AppColors.primaryGreen.withOpacity(0.8),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Event name and status indicator
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            event['name'] ?? 'Unnamed Event',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                        if (userStatus != null)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: userStatus == 'going' 
+                                  ? Colors.green 
+                                  : userStatus == 'interested'
+                                      ? Colors.blue
+                                      : Colors.grey,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              userStatus.toString().toUpperCase(),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    // Creator info
+                    if (creator != null)
+                      Text(
+                        'By ${creator['firstName']} ${creator['lastName']}',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Colors.white,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    const SizedBox(height: 8),
+                    // Event details row
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 8,
+                      children: [
+                        // Date
+                        if (eventDate != null)
+                          _buildEventInfoChip(
+                            Icons.calendar_today,
+                            '${eventDate.day}/${eventDate.month}/${eventDate.year}',
+                            AppColors.primaryGreen,
+                          ),
+                        // Time
+                        if (event['eventTime'] != null)
+                          _buildEventInfoChip(
+                            Icons.access_time,
+                            event['eventTime'].substring(0, 5),
+                            AppColors.primaryGreen,
+                          ),
+                        // Distance
+                        if (distance != null)
+                          _buildEventInfoChip(
+                            Icons.location_on,
+                            '$distance km',
+                            AppColors.greenAccent,
+                          ),
+                        // Participants
+                        _buildEventInfoChip(
+                          Icons.people,
+                          maxParticipants != null 
+                              ? '$participantCount/$maxParticipants'
+                              : '$participantCount',
+                          Colors.blue,
+                        ),
+                      ],
+                    ),
+                    // Description
+                    if (event['description'] != null && event['description'].toString().isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        event['description'],
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Colors.white,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                    // Location
+                    if (event['location'] != null && event['location'].toString().isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          const Icon(Icons.place, size: 16, color: Colors.white70),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              event['location'],
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: Colors.white,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildEventInfoChip(IconData icon, String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.9),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: Colors.white),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showEventDetailsDialog(Map<String, dynamic> event) {
+    final creator = event['creator'];
+    final eventDate = event['eventDate'] != null 
+        ? DateTime.parse(event['eventDate'])
+        : null;
+    final participantCount = event['currentParticipants'] ?? 0;
+    final maxParticipants = event['maxParticipants'];
+    final userStatus = event['userStatus'];
+    final isParticipating = event['isParticipating'] == true;
+    final isCreator = creator != null && creator['id'] == _userProfile?['userId'];
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Expanded(child: Text(event['name'] ?? 'Event Details')),
+            if (isCreator)
+              IconButton(
+                icon: Icon(Icons.edit, color: AppColors.primaryGreen),
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  _showEditEventDialog(event);
+                },
+                tooltip: 'Edit Event',
+              ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Creator
+              if (creator != null)
+                Text(
+                  'Organized by ${creator['firstName']} ${creator['lastName']}',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              const SizedBox(height: 12),
+              // Date & Time
+              if (eventDate != null)
+                _buildDetailRow(
+                  Icons.calendar_today,
+                  'Date',
+                  '${eventDate.day}/${eventDate.month}/${eventDate.year}',
+                ),
+              if (event['eventTime'] != null)
+                _buildDetailRow(
+                  Icons.access_time,
+                  'Time',
+                  event['eventTime'].substring(0, 5),
+                ),
+              // Location
+              if (event['location'] != null)
+                _buildDetailRow(
+                  Icons.place,
+                  'Location',
+                  event['location'],
+                ),
+              // Distance
+              if (event['distance'] != null)
+                _buildDetailRow(
+                  Icons.location_on,
+                  'Distance',
+                  '${event['distance']} km away',
+                ),
+              // Participants
+              _buildDetailRow(
+                Icons.people,
+                'Participants',
+                maxParticipants != null 
+                    ? '$participantCount / $maxParticipants'
+                    : '$participantCount',
+              ),
+              // Description
+              if (event['description'] != null && event['description'].toString().isNotEmpty) ...[
+                const SizedBox(height: 12),
+                const Text(
+                  'Description:',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  event['description'],
+                  style: const TextStyle(fontSize: 14),
+                ),
+              ],
+              // Current status
+              if (userStatus != null) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryGreen,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.check_circle, color: Colors.white, size: 20),
+                      const SizedBox(width: 8),
+                      Text(
+                        'You are ${userStatus == 'going' ? 'attending' : userStatus}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          if (!isParticipating)
+            ElevatedButton.icon(
+              onPressed: () async {
+                Navigator.of(context).pop();
+                final result = await EventService.participateInEvent(
+                  eventId: event['id'].toString(),
+                  status: 'going',
+                );
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(result['success'] == true 
+                          ? 'You are now attending this event!'
+                          : result['message'] ?? 'Failed to join event'),
+                      backgroundColor: result['success'] == true 
+                          ? Colors.green 
+                          : Colors.red,
+                    ),
+                  );
+                  if (result['success'] == true) {
+                    _loadData();
+                  }
+                }
+              },
+              icon: const Icon(Icons.check),
+              label: const Text('Join Event'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryGreen,
+                foregroundColor: Colors.white,
+              ),
+            )
+          else
+            TextButton.icon(
+              onPressed: () async {
+                Navigator.of(context).pop();
+                final result = await EventService.leaveEvent(
+                  event['id'].toString(),
+                );
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(result['success'] == true 
+                          ? 'You have left the event'
+                          : result['message'] ?? 'Failed to leave event'),
+                      backgroundColor: result['success'] == true 
+                          ? Colors.orange 
+                          : Colors.red,
+                    ),
+                  );
+                  if (result['success'] == true) {
+                    _loadData();
+                  }
+                }
+              },
+              icon: const Icon(Icons.exit_to_app),
+              label: const Text('Leave Event'),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.red,
+              ),
+            ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: AppColors.primaryGreen),
+          const SizedBox(width: 8),
+          Text(
+            '$label: ',
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontSize: 14),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showEditEventDialog(Map<String, dynamic> event) {
+    final TextEditingController nameController = TextEditingController(text: event['name']);
+    final TextEditingController descriptionController = TextEditingController(text: event['description'] ?? '');
+    final TextEditingController locationController = TextEditingController(text: event['location'] ?? '');
+    DateTime? selectedDate = event['eventDate'] != null ? DateTime.parse(event['eventDate']) : null;
+    TimeOfDay? selectedTime;
+    
+    // Parse existing time if available
+    if (event['eventTime'] != null) {
+      final timeParts = event['eventTime'].split(':');
+      selectedTime = TimeOfDay(
+        hour: int.parse(timeParts[0]),
+        minute: int.parse(timeParts[1]),
+      );
+    }
+    
+    double? eventLatitude = event['latitude'] != null ? double.tryParse(event['latitude'].toString()) : null;
+    double? eventLongitude = event['longitude'] != null ? double.tryParse(event['longitude'].toString()) : null;
+    
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.edit, color: AppColors.primaryGreen),
+              const SizedBox(width: 8),
+              const Text('Edit Event'),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Update your event details',
+                  style: TextStyle(fontSize: 14, color: Colors.grey),
+                ),
+                const SizedBox(height: 20),
+                TextField(
+                  controller: nameController,
+                  decoration: InputDecoration(
+                    labelText: 'Event Name',
+                    hintText: 'e.g., Coffee Meetup',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    prefixIcon: const Icon(Icons.event),
+                  ),
+                  maxLength: 50,
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: descriptionController,
+                  decoration: InputDecoration(
+                    labelText: 'Description',
+                    hintText: 'What will happen at this event?',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    prefixIcon: const Icon(Icons.description),
+                  ),
+                  maxLines: 3,
+                  maxLength: 200,
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: locationController,
+                        decoration: InputDecoration(
+                          labelText: 'Location',
+                          hintText: 'Enter address or place name',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          prefixIcon: const Icon(Icons.location_on),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      onPressed: () async {
+                        try {
+                          final location = await LocationService.getCurrentLocation();
+                          if (location != null) {
+                            setState(() {
+                              eventLatitude = location['latitude'];
+                              eventLongitude = location['longitude'];
+                            });
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Current location set'),
+                                backgroundColor: Colors.green,
+                                duration: Duration(seconds: 1),
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Failed to get location: $e'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      },
+                      icon: Icon(Icons.my_location, color: AppColors.textPrimaryLight),
+                      tooltip: 'Use current GPS location',
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          final date = await showDatePicker(
+                            context: context,
+                            initialDate: selectedDate ?? DateTime.now(),
+                            firstDate: DateTime.now(),
+                            lastDate: DateTime.now().add(const Duration(days: 365)),
+                          );
+                          if (date != null) {
+                            setState(() => selectedDate = date);
+                          }
+                        },
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.textPrimaryLight,
+                          side: BorderSide(color: AppColors.textPrimaryLight),
+                        ),
+                        icon: Icon(Icons.calendar_today, color: AppColors.textPrimaryLight),
+                        label: Text(
+                          selectedDate != null
+                              ? '${selectedDate!.day}/${selectedDate!.month}/${selectedDate!.year}'
+                              : 'Select Date',
+                          style: TextStyle(color: AppColors.textPrimaryLight),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          final time = await showTimePicker(
+                            context: context,
+                            initialTime: selectedTime ?? TimeOfDay.now(),
+                          );
+                          if (time != null) {
+                            setState(() => selectedTime = time);
+                          }
+                        },
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.textPrimaryLight,
+                          side: BorderSide(color: AppColors.textPrimaryLight),
+                        ),
+                        icon: Icon(Icons.access_time, color: AppColors.textPrimaryLight),
+                        label: Text(
+                          selectedTime != null
+                              ? '${selectedTime!.hour}:${selectedTime!.minute.toString().padLeft(2, '0')}'
+                              : 'Select Time',
+                          style: TextStyle(color: AppColors.textPrimaryLight),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.textPrimaryLight,
+              ),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (nameController.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Please enter an event name'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                  return;
+                }
+                
+                Navigator.of(context).pop();
+                
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Updating event...'),
+                    duration: Duration(seconds: 1),
+                  ),
+                );
+                
+                // Call API to update event
+                final result = await EventService.updateEvent(
+                  eventId: event['id'].toString(),
+                  name: nameController.text.trim(),
+                  description: descriptionController.text.trim().isEmpty 
+                      ? null 
+                      : descriptionController.text.trim(),
+                  location: locationController.text.trim().isEmpty 
+                      ? null 
+                      : locationController.text.trim(),
+                  latitude: eventLatitude,
+                  longitude: eventLongitude,
+                  eventDate: selectedDate,
+                  eventTime: selectedTime != null 
+                      ? '${selectedTime!.hour.toString().padLeft(2, '0')}:${selectedTime!.minute.toString().padLeft(2, '0')}:00'
+                      : null,
+                );
+                
+                if (mounted) {
+                  if (result['success'] == true) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Event updated successfully!'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                    _loadData();
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(result['message'] ?? 'Failed to update event'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryGreen,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Update'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showCreateGroupDialog() {
+    final TextEditingController nameController = TextEditingController();
+    final TextEditingController descriptionController = TextEditingController();
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.group_add, color: AppColors.primaryGreen),
+            const SizedBox(width: 8),
+            const Text('Create Group'),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Create a group to connect with multiple people who share similar interests.',
+                style: TextStyle(fontSize: 14, color: Colors.grey),
+              ),
+              const SizedBox(height: 20),
+              TextField(
+                controller: nameController,
+                decoration: InputDecoration(
+                  labelText: 'Group Name',
+                  hintText: 'e.g., Hiking Enthusiasts',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  prefixIcon: const Icon(Icons.label),
+                ),
+                maxLength: 50,
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: descriptionController,
+                decoration: InputDecoration(
+                  labelText: 'Description',
+                  hintText: 'What is this group about?',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  prefixIcon: const Icon(Icons.description),
+                ),
+                maxLines: 3,
+                maxLength: 200,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.textPrimaryLight,
+            ),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (nameController.text.trim().isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Please enter a group name'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+                return;
+              }
+              
+              // TODO: Call API to create group
+              Navigator.of(context).pop();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Group "${nameController.text}" created! (Coming soon)'),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryGreen,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Create'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showCreateEventDialog() {
+    final TextEditingController nameController = TextEditingController();
+    final TextEditingController descriptionController = TextEditingController();
+    final TextEditingController locationController = TextEditingController();
+    DateTime? selectedDate;
+    TimeOfDay? selectedTime;
+    double? eventLatitude;
+    double? eventLongitude;
+    
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.event_available, color: AppColors.primaryGreen),
+              const SizedBox(width: 8),
+              const Text('Create Event'),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Organize an event and invite people to join!',
+                  style: TextStyle(fontSize: 14, color: Colors.grey),
+                ),
+                const SizedBox(height: 20),
+                TextField(
+                  controller: nameController,
+                  decoration: InputDecoration(
+                    labelText: 'Event Name',
+                    hintText: 'e.g., Coffee Meetup',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    prefixIcon: const Icon(Icons.event),
+                  ),
+                  maxLength: 50,
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: descriptionController,
+                  decoration: InputDecoration(
+                    labelText: 'Description',
+                    hintText: 'What will happen at this event?',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    prefixIcon: const Icon(Icons.description),
+                  ),
+                  maxLines: 3,
+                  maxLength: 200,
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: locationController,
+                        decoration: InputDecoration(
+                          labelText: 'Location',
+                          hintText: 'Enter address or place name',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          prefixIcon: const Icon(Icons.location_on),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      onPressed: () async {
+                        try {
+                          final location = await LocationService.getCurrentLocation();
+                          if (location != null) {
+                            setState(() {
+                              eventLatitude = location['latitude'];
+                              eventLongitude = location['longitude'];
+                            });
+                            // Show confirmation
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Current location set'),
+                                backgroundColor: Colors.green,
+                                duration: Duration(seconds: 1),
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Failed to get location: $e'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      },
+                      icon: Icon(Icons.my_location, color: AppColors.textPrimaryLight),
+                      tooltip: 'Use current GPS location',
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          final date = await showDatePicker(
+                            context: context,
+                            initialDate: DateTime.now(),
+                            firstDate: DateTime.now(),
+                            lastDate: DateTime.now().add(const Duration(days: 365)),
+                          );
+                          if (date != null) {
+                            setState(() => selectedDate = date);
+                          }
+                        },
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.textPrimaryLight,
+                          side: BorderSide(color: AppColors.textPrimaryLight),
+                        ),
+                        icon: Icon(Icons.calendar_today, color: AppColors.textPrimaryLight),
+                        label: Text(
+                          selectedDate != null
+                              ? '${selectedDate!.day}/${selectedDate!.month}/${selectedDate!.year}'
+                              : 'Select Date',
+                          style: TextStyle(color: AppColors.textPrimaryLight),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          final time = await showTimePicker(
+                            context: context,
+                            initialTime: TimeOfDay.now(),
+                          );
+                          if (time != null) {
+                            setState(() => selectedTime = time);
+                          }
+                        },
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.textPrimaryLight,
+                          side: BorderSide(color: AppColors.textPrimaryLight),
+                        ),
+                        icon: Icon(Icons.access_time, color: AppColors.textPrimaryLight),
+                        label: Text(
+                          selectedTime != null
+                              ? '${selectedTime!.hour}:${selectedTime!.minute.toString().padLeft(2, '0')}'
+                              : 'Select Time',
+                          style: TextStyle(color: AppColors.textPrimaryLight),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.textPrimaryLight,
+              ),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (nameController.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Please enter an event name'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                  return;
+                }
+                
+                Navigator.of(context).pop();
+                
+                // Show loading indicator
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Creating event...'),
+                    duration: Duration(seconds: 1),
+                  ),
+                );
+                
+                // Call API to create event
+                final result = await EventService.createEvent(
+                  name: nameController.text.trim(),
+                  description: descriptionController.text.trim().isEmpty 
+                      ? null 
+                      : descriptionController.text.trim(),
+                  location: locationController.text.trim().isEmpty 
+                      ? null 
+                      : locationController.text.trim(),
+                  latitude: eventLatitude,
+                  longitude: eventLongitude,
+                  eventDate: selectedDate,
+                  eventTime: selectedTime != null 
+                      ? '${selectedTime!.hour.toString().padLeft(2, '0')}:${selectedTime!.minute.toString().padLeft(2, '0')}:00'
+                      : null,
+                );
+                
+                if (mounted) {
+                  if (result['success'] == true) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Event "${nameController.text}" created successfully!'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                    // Refresh events list
+                    _loadData();
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(result['message'] ?? 'Failed to create event'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryGreen,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Create'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
@@ -511,6 +1535,29 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
 
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
+      floatingActionButton: _viewMode != 'solo'
+          ? FloatingActionButton.extended(
+              onPressed: () {
+                if (_viewMode == 'group') {
+                  _showCreateGroupDialog();
+                } else if (_viewMode == 'event') {
+                  _showCreateEventDialog();
+                }
+              },
+              backgroundColor: AppColors.primaryGreen,
+              icon: Icon(
+                _viewMode == 'group' ? Icons.group_add : Icons.event_available,
+                color: Colors.white,
+              ),
+              label: Text(
+                _viewMode == 'group' ? 'Create Group' : 'Create Event',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            )
+          : null,
       appBar: AppBar(
         title: const Text(
           'Explore',
@@ -527,6 +1574,154 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
             onPressed: _refreshData,
           ),
         ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(60),
+          child: Container(
+            color: AppColors.primaryGreen,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            child: Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      if (_viewMode != 'solo') {
+                        setState(() {
+                          _viewMode = 'solo';
+                          _currentIndex = 0;
+                        });
+                        _loadData();
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      decoration: BoxDecoration(
+                        color: _viewMode == 'solo' 
+                            ? Colors.white 
+                            : Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.person,
+                            color: _viewMode == 'solo' 
+                                ? AppColors.primaryGreen 
+                                : Colors.white,
+                            size: 20,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Solo',
+                            style: TextStyle(
+                              color: _viewMode == 'solo' 
+                                  ? AppColors.primaryGreen 
+                                  : Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      if (_viewMode != 'group') {
+                        setState(() {
+                          _viewMode = 'group';
+                          _currentIndex = 0;
+                        });
+                        _loadData();
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      decoration: BoxDecoration(
+                        color: _viewMode == 'group' 
+                            ? Colors.white 
+                            : Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.groups,
+                            color: _viewMode == 'group' 
+                                ? AppColors.primaryGreen 
+                                : Colors.white,
+                            size: 20,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Group',
+                            style: TextStyle(
+                              color: _viewMode == 'group' 
+                                  ? AppColors.primaryGreen 
+                                  : Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      if (_viewMode != 'event') {
+                        setState(() {
+                          _viewMode = 'event';
+                          _currentIndex = 0;
+                        });
+                        _loadData();
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      decoration: BoxDecoration(
+                        color: _viewMode == 'event' 
+                            ? Colors.white 
+                            : Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.event,
+                            color: _viewMode == 'event' 
+                                ? AppColors.primaryGreen 
+                                : Colors.white,
+                            size: 20,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Event',
+                            style: TextStyle(
+                              color: _viewMode == 'event' 
+                                  ? AppColors.primaryGreen 
+                                  : Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
       body: _isLoading
           ? const Center(
@@ -569,7 +1764,9 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
                     ],
                   ),
                 )
-              : _potentialMatches.isEmpty || _currentIndex >= _potentialMatches.length
+              : (_viewMode == 'event' 
+                    ? _events.isEmpty 
+                    : _potentialMatches.isEmpty || _currentIndex >= _potentialMatches.length)
                   ? Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -611,12 +1808,41 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
                           else
                             Column(
                               children: [
-                                const Text(
-                                  'No more profiles to show.',
-                                  style: TextStyle(
-                                    fontSize: 16,
+                                Icon(
+                                  _viewMode == 'solo' 
+                                      ? Icons.person_off 
+                                      : _viewMode == 'group'
+                                          ? Icons.group_off
+                                          : Icons.event_busy,
+                                  size: 64,
+                                  color: Colors.grey,
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  _viewMode == 'solo' 
+                                      ? 'No more solo profiles available!'
+                                      : _viewMode == 'group'
+                                          ? 'No group profiles available yet!'
+                                          : 'No events available yet!',
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
                                     color: Colors.grey,
                                   ),
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  _viewMode == 'solo' 
+                                      ? 'Check back later or try adjusting your preferences.'
+                                      : _viewMode == 'group'
+                                          ? 'Group matching coming soon! Try Solo mode.'
+                                          : 'Event matching coming soon! Try Solo mode.',
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.grey,
+                                  ),
+                                  textAlign: TextAlign.center,
                                 ),
                                 const SizedBox(height: 20),
                                 ElevatedButton(
@@ -632,7 +1858,9 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
                         ],
                       ),
                     )
-                  : Column(
+                  : _viewMode == 'event' 
+                      ? _buildEventsList()
+                      : Column(
                       children: [
                         Expanded(
                           child: Center(
@@ -768,7 +1996,7 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
                                             crossAxisAlignment: CrossAxisAlignment.start,
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
-                                              // Age and Relationship Type Row
+                                              // Age, Distance and Relationship Type Row
                                               Row(
                                                 children: [
                                                   // Age
@@ -789,6 +2017,36 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
                                                       ),
                                                     ),
                                                   if (_potentialMatches[_currentIndex]['age'] != null)
+                                                    const SizedBox(width: 8),
+                                                  // Distance (if available in local mode)
+                                                  if (_potentialMatches[_currentIndex]['distance'] != null)
+                                                    Container(
+                                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                      decoration: BoxDecoration(
+                                                        color: AppColors.primaryGreen.withOpacity(0.7),
+                                                        borderRadius: BorderRadius.circular(12),
+                                                      ),
+                                                      child: Row(
+                                                        mainAxisSize: MainAxisSize.min,
+                                                        children: [
+                                                          const Icon(
+                                                            Icons.location_on,
+                                                            size: 14,
+                                                            color: Colors.white,
+                                                          ),
+                                                          const SizedBox(width: 4),
+                                                          Text(
+                                                            '${_potentialMatches[_currentIndex]['distance']} km',
+                                                            style: const TextStyle(
+                                                              fontSize: 14,
+                                                              fontWeight: FontWeight.w600,
+                                                              color: Colors.white,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  if (_potentialMatches[_currentIndex]['distance'] != null)
                                                     const SizedBox(width: 8),
                                                   // Relationship Type
                                                   if (_potentialMatches[_currentIndex]['relationshipType'] != null)
@@ -815,6 +2073,48 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
                                                 maxLines: 3,
                                                 overflow: TextOverflow.ellipsis,
                                               ),
+                                              // Matching Keywords
+                                              if (_potentialMatches[_currentIndex]['matchingKeywords'] != null && 
+                                                  (_potentialMatches[_currentIndex]['matchingKeywords'] as List).isNotEmpty) ...[
+                                                const SizedBox(height: 12),
+                                                Wrap(
+                                                  spacing: 6,
+                                                  runSpacing: 6,
+                                                  children: (_potentialMatches[_currentIndex]['matchingKeywords'] as List)
+                                                      .take(5) // Show max 5 matching keywords
+                                                      .map((keyword) => Container(
+                                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                                            decoration: BoxDecoration(
+                                                              color: AppColors.greenAccent.withOpacity(0.9),
+                                                              borderRadius: BorderRadius.circular(15),
+                                                              border: Border.all(
+                                                                color: Colors.white.withOpacity(0.3),
+                                                                width: 1,
+                                                              ),
+                                                            ),
+                                                            child: Row(
+                                                              mainAxisSize: MainAxisSize.min,
+                                                              children: [
+                                                                const Icon(
+                                                                  Icons.check_circle,
+                                                                  size: 14,
+                                                                  color: Colors.white,
+                                                                ),
+                                                                const SizedBox(width: 4),
+                                                                Text(
+                                                                  keyword.toString(),
+                                                                  style: const TextStyle(
+                                                                    fontSize: 12,
+                                                                    fontWeight: FontWeight.bold,
+                                                                    color: Colors.white,
+                                                                  ),
+                                                                ),
+                                                              ],
+                                                            ),
+                                                          ))
+                                                      .toList(),
+                                                ),
+                                              ],
                                             ],
                                           ),
                                         ),
