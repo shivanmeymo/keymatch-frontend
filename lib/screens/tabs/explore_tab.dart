@@ -6,6 +6,7 @@ import 'package:key_match/services/event_service.dart';
 import 'package:key_match/services/location_service.dart';
 import 'package:key_match/screens/detailed_profile_screen.dart';
 import 'package:key_match/screens/premium_features_screen.dart';
+import 'package:key_match/screens/chat_screen.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:io' show Platform;
 import 'package:key_match/constants/colors.dart';
@@ -32,13 +33,14 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
   Map<String, dynamic>? _suggestion;
   bool _isLoading = true;
   String? _error;
+  String? _rawError; // Store the raw error for debugging
   int _currentIndex = 0;
   bool _actionLoading = false;
   // --- Animation state ---
   String _lastAction = 'none'; // 'like', 'dislike', or 'none'
   bool _showActionOverlay = false;
   // --- View mode state ---
-  String _viewMode = 'solo'; // 'solo', 'group', or 'event'
+  String _viewMode = 'solo'; // 'solo' or 'event'
 
   @override
   void initState() {
@@ -90,7 +92,7 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
           });
         }
       } else {
-        // Load potential matches for solo/group mode
+        // Load potential matches for solo mode
         final matchesResponse = await ProfileService.getPotentialMatches(
           genderPreference: profile?['genderPreference'],
         );
@@ -129,8 +131,39 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
       }
     } catch (error) {
       if (mounted) {
+        print('🚨 Error loading explore data: $error');
+        print('🚨 Error type: ${error.runtimeType}');
+        
+        // Store raw error for debugging
+        String rawError = error.toString();
+        
+        // Provide more specific error messages based on the error type
+        String errorMessage = rawError;
+        
+        // Check for different types of errors
+        if (errorMessage.contains('Profile not found') || errorMessage.contains('404')) {
+          errorMessage = 'Welcome! Please complete your profile to start exploring matches.';
+        } else if (errorMessage.contains('SocketException') || 
+                   errorMessage.contains('Failed host lookup') ||
+                   errorMessage.contains('Network is unreachable')) {
+          errorMessage = 'Network connection error. Please check your internet connection and try again.';
+        } else if (errorMessage.contains('Connection refused') || 
+                   errorMessage.contains('Connection timed out')) {
+          errorMessage = 'Cannot connect to server. The service may be temporarily unavailable.';
+        } else if (errorMessage.contains('401') || errorMessage.contains('403')) {
+          errorMessage = 'Authentication error. Please try logging out and back in.';
+        } else if (errorMessage.contains('500') || errorMessage.contains('Server error')) {
+          errorMessage = 'Server error occurred. Please try again in a few moments.';
+        } else if (errorMessage.contains('timeout')) {
+          errorMessage = 'Request timed out. Please check your connection and try again.';
+        } else {
+          // Keep the original error message but make it more user-friendly
+          errorMessage = 'Unable to load profiles. ${errorMessage.replaceAll('Exception:', '').replaceAll('Network error:', '').trim()}';
+        }
+        
         setState(() {
-          _error = error.toString();
+          _error = errorMessage;
+          _rawError = rawError;
           _isLoading = false;
         });
       }
@@ -186,6 +219,7 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
   }
 
   Future<void> _handleAction(String actionType) async {
+    // Solo mode handling
     if (_currentIndex >= _potentialMatches.length) return;
     if (_actionLoading) return;
 
@@ -265,7 +299,10 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
         if (response['isMatch'] == true) {
           print('MATCH DETECTED! Showing match alert...');
           if (mounted) {
-            _showMatchAlert(currentProfile);
+            final matchId = response['matchId'] ?? response['match']?['id'];
+            if (matchId != null) {
+              _showMatchAlert(currentProfile, matchId);
+            }
           }
           // Store match_id for future chat functionality
           if (response['match_id'] != null) {
@@ -344,13 +381,17 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
             
             print('Like with message response: $response');
             
-            // Check if it's a match
+            // Premium messages always create a match
             if (response['isMatch'] == true) {
-              print('MATCH DETECTED! Showing match alert...');
+              print('MATCH CREATED! Showing match alert...');
               if (mounted) {
-                _showMatchAlert(currentProfile);
+                final matchId = response['matchId'] ?? response['match']?['id'];
+                if (matchId != null) {
+                  _showMatchAlert(currentProfile, matchId);
+                }
               }
             } else {
+              // This shouldn't happen with premium messages, but handle it just in case
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Message sent and profile liked!')),
@@ -431,7 +472,7 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
     );
   }
 
-  void _showMatchAlert(Map<String, dynamic> profile) {
+  void _showMatchAlert(Map<String, dynamic> profile, int matchId) {
     final userName = _getUserName(profile);
     
     showDialog(
@@ -445,18 +486,30 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
-                // TODO: Navigate to chat with match_id
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Chat functionality coming soon!')),
+                // Navigate to chat screen
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => ChatScreen(
+                      matchId: matchId.toString(),
+                      userName: userName,
+                    ),
+                  ),
                 );
               },
-              child: const Text('Start Chatting'),
+              child: const Text(
+                'Start Chatting',
+                style: TextStyle(color: Colors.white),
+              ),
             ),
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
               },
-              child: const Text('Keep Swiping'),
+              child: const Text(
+                'Keep Swiping',
+                style: TextStyle(color: Colors.white),
+              ),
             ),
           ],
         );
@@ -734,7 +787,24 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
     final maxParticipants = event['maxParticipants'];
     final userStatus = event['userStatus'];
     final isParticipating = event['isParticipating'] == true;
-    final isCreator = creator != null && creator['id'] == _userProfile?['userId'];
+    
+    // Debug creator check
+    print('=== DEBUG EVENT CREATOR CHECK ===');
+    print('Creator: $creator');
+    print('Creator ID: ${creator?['id']}');
+    print('User Profile: $_userProfile');
+    print('User Profile userId: ${_userProfile?['userId']}');
+    print('User Profile id: ${_userProfile?['id']}');
+    print('Event creatorId: ${event['creatorId']}');
+    
+    final isCreator = creator != null && 
+        (creator['id'] == _userProfile?['userId'] || 
+         creator['id'] == _userProfile?['id'] ||
+         event['creatorId'] == _userProfile?['userId'] ||
+         event['creatorId'] == _userProfile?['id']);
+    
+    print('isCreator: $isCreator');
+    print('isParticipating: $isParticipating');
     
     showDialog(
       context: context,
@@ -744,7 +814,7 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
             Expanded(child: Text(event['name'] ?? 'Event Details')),
             if (isCreator)
               IconButton(
-                icon: Icon(Icons.edit, color: AppColors.primaryGreen),
+                icon: const Icon(Icons.edit, color: Colors.white),
                 onPressed: () {
                   Navigator.of(context).pop();
                   _showEditEventDialog(event);
@@ -819,6 +889,28 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
                   style: const TextStyle(fontSize: 14),
                 ),
               ],
+              // Attendees List
+              if (isParticipating || isCreator) ...[
+                const SizedBox(height: 12),
+                const Text(
+                  'Attendees:',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextButton.icon(
+                  onPressed: () {
+                    _showAttendeesDialog(event);
+                  },
+                  icon: const Icon(Icons.people, color: Colors.white),
+                  label: Text(
+                    'View $participantCount ${participantCount == 1 ? 'attendee' : 'attendees'}',
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                ),
+              ],
               // Current status
               if (userStatus != null) ...[
                 const SizedBox(height: 12),
@@ -847,6 +939,29 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
           ),
         ),
         actions: [
+          // Message Creator button (for participants, not the creator themselves)
+          if (isParticipating && !isCreator && creator != null)
+            TextButton.icon(
+              onPressed: () {
+                Navigator.of(context).pop();
+                // Navigate to chat with event creator
+                final creatorName = '${creator['firstName']} ${creator['lastName']}'.trim();
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => ChatScreen(
+                      matchId: 'event_${event['id']}_${creator['id']}', // Temporary ID for event-based chats
+                      userName: creatorName,
+                    ),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.message, color: Colors.white),
+              label: const Text(
+                'Message Creator',
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
           if (!isParticipating)
             ElevatedButton.icon(
               onPressed: () async {
@@ -1192,93 +1307,146 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
     );
   }
 
-  void _showCreateGroupDialog() {
-    final TextEditingController nameController = TextEditingController();
-    final TextEditingController descriptionController = TextEditingController();
+  void _showAttendeesDialog(Map<String, dynamic> event) async {
+    // Fetch full event details to get participant list
+    final result = await EventService.getEventById(event['id'].toString());
+    
+    if (result['success'] != true || result['event'] == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message'] ?? 'Failed to load attendees'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+    
+    final fullEvent = result['event'];
+    final participants = fullEvent['participants'] as List<dynamic>? ?? [];
+    
+    if (!mounted) return;
     
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: Row(
           children: [
-            Icon(Icons.group_add, color: AppColors.primaryGreen),
+            const Icon(Icons.people, color: Colors.white),
             const SizedBox(width: 8),
-            const Text('Create Group'),
+            Text('Attendees (${participants.length})'),
           ],
         ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Create a group to connect with multiple people who share similar interests.',
-                style: TextStyle(fontSize: 14, color: Colors.grey),
-              ),
-              const SizedBox(height: 20),
-              TextField(
-                controller: nameController,
-                decoration: InputDecoration(
-                  labelText: 'Group Name',
-                  hintText: 'e.g., Hiking Enthusiasts',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
+        content: Container(
+          width: double.maxFinite,
+          child: participants.isEmpty
+              ? const Padding(
+                  padding: EdgeInsets.all(20.0),
+                  child: Text(
+                    'No attendees yet',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.grey),
                   ),
-                  prefixIcon: const Icon(Icons.label),
+                )
+              : ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: participants.length,
+                  itemBuilder: (context, index) {
+                    final participant = participants[index];
+                    final user = participant['user'];
+                    final status = participant['status'] ?? 'interested';
+                    final userName = user != null 
+                        ? '${user['firstName'] ?? ''} ${user['lastName'] ?? ''}'.trim()
+                        : 'Unknown User';
+                    
+                    // Debug: Print user data structure
+                    print('=== ATTENDEE DEBUG ===');
+                    print('User data: $user');
+                    if (user != null) {
+                      print('User profile: ${user['profile']}');
+                      print('User images: ${user['images']}');
+                    }
+                    
+                    // Get profile picture URL
+                    String? profilePictureUrl;
+                    if (user != null) {
+                      // Try to get from user's profile data
+                      final userProfile = user['profile'];
+                      if (userProfile != null) {
+                        // Try profile images first
+                        if (userProfile['images'] != null && userProfile['images'].isNotEmpty) {
+                          profilePictureUrl = ProfileService.getFullImageUrl(userProfile['images'][0]['imageUrl']);
+                        } else if (userProfile['profilePicture'] != null && userProfile['profilePicture'].isNotEmpty) {
+                          profilePictureUrl = ProfileService.getFullImageUrl(userProfile['profilePicture']);
+                        }
+                      }
+                      // Fallback to user-level fields
+                      if (profilePictureUrl == null) {
+                        if (user['images'] != null && user['images'].isNotEmpty) {
+                          profilePictureUrl = ProfileService.getFullImageUrl(user['images'][0]['imageUrl']);
+                        } else if (user['profilePicture'] != null && user['profilePicture'].isNotEmpty) {
+                          profilePictureUrl = ProfileService.getFullImageUrl(user['profilePicture']);
+                        }
+                      }
+                    }
+                    
+                    final statusIcon = status == 'going' 
+                        ? Icons.check_circle
+                        : Icons.help_outline;
+                    
+                    final statusColor = status == 'going'
+                        ? Colors.green
+                        : Colors.orange;
+                    
+                    return ListTile(
+                      leading: CircleAvatar(
+                        radius: 25,
+                        backgroundColor: Colors.grey[300],
+                        backgroundImage: profilePictureUrl != null && profilePictureUrl.isNotEmpty
+                            ? NetworkImage(profilePictureUrl)
+                            : null,
+                        child: profilePictureUrl == null || profilePictureUrl.isEmpty
+                            ? Text(
+                                userName.isNotEmpty ? userName[0].toUpperCase() : '?',
+                                style: const TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              )
+                            : null,
+                      ),
+                      title: Text(
+                        userName,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                      subtitle: Text(
+                        status == 'going' ? 'Going' : 'Maybe',
+                        style: TextStyle(
+                          color: statusColor,
+                          fontSize: 12,
+                        ),
+                      ),
+                      trailing: Icon(
+                        statusIcon,
+                        color: statusColor,
+                        size: 20,
+                      ),
+                    );
+                  },
                 ),
-                maxLength: 50,
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: descriptionController,
-                decoration: InputDecoration(
-                  labelText: 'Description',
-                  hintText: 'What is this group about?',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  prefixIcon: const Icon(Icons.description),
-                ),
-                maxLines: 3,
-                maxLength: 200,
-              ),
-            ],
-          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            style: TextButton.styleFrom(
-              foregroundColor: AppColors.textPrimaryLight,
+            child: const Text(
+              'Close',
+              style: TextStyle(color: Colors.white),
             ),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              if (nameController.text.trim().isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Please enter a group name'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-                return;
-              }
-              
-              // TODO: Call API to create group
-              Navigator.of(context).pop();
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Group "${nameController.text}" created! (Coming soon)'),
-                  backgroundColor: Colors.green,
-                ),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryGreen,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Create'),
           ),
         ],
       ),
@@ -1289,6 +1457,7 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
     final TextEditingController nameController = TextEditingController();
     final TextEditingController descriptionController = TextEditingController();
     final TextEditingController locationController = TextEditingController();
+    final TextEditingController durationController = TextEditingController();
     DateTime? selectedDate;
     TimeOfDay? selectedTime;
     double? eventLatitude;
@@ -1389,6 +1558,20 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
                       tooltip: 'Use current GPS location',
                     ),
                   ],
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: durationController,
+                  decoration: InputDecoration(
+                    labelText: 'Duration (minutes)',
+                    hintText: 'e.g., 120 (2 hours)',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    prefixIcon: const Icon(Icons.schedule),
+                  ),
+                  keyboardType: TextInputType.number,
+                  maxLength: 4,
                 ),
                 const SizedBox(height: 16),
                 Row(
@@ -1494,6 +1677,9 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
                   eventTime: selectedTime != null 
                       ? '${selectedTime!.hour.toString().padLeft(2, '0')}:${selectedTime!.minute.toString().padLeft(2, '0')}:00'
                       : null,
+                  duration: durationController.text.trim().isEmpty 
+                      ? null 
+                      : int.tryParse(durationController.text.trim()),
                 );
                 
                 if (mounted) {
@@ -1535,23 +1721,19 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
 
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
-      floatingActionButton: _viewMode != 'solo'
+      floatingActionButton: _viewMode == 'event'
           ? FloatingActionButton.extended(
               onPressed: () {
-                if (_viewMode == 'group') {
-                  _showCreateGroupDialog();
-                } else if (_viewMode == 'event') {
-                  _showCreateEventDialog();
-                }
+                _showCreateEventDialog();
               },
               backgroundColor: AppColors.primaryGreen,
-              icon: Icon(
-                _viewMode == 'group' ? Icons.group_add : Icons.event_available,
+              icon: const Icon(
+                Icons.event_available,
                 color: Colors.white,
               ),
-              label: Text(
-                _viewMode == 'group' ? 'Create Group' : 'Create Event',
-                style: const TextStyle(
+              label: const Text(
+                'Create Event',
+                style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
                 ),
@@ -1630,52 +1812,6 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
                 Expanded(
                   child: GestureDetector(
                     onTap: () {
-                      if (_viewMode != 'group') {
-                        setState(() {
-                          _viewMode = 'group';
-                          _currentIndex = 0;
-                        });
-                        _loadData();
-                      }
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      decoration: BoxDecoration(
-                        color: _viewMode == 'group' 
-                            ? Colors.white 
-                            : Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.groups,
-                            color: _viewMode == 'group' 
-                                ? AppColors.primaryGreen 
-                                : Colors.white,
-                            size: 20,
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'Group',
-                            style: TextStyle(
-                              color: _viewMode == 'group' 
-                                  ? AppColors.primaryGreen 
-                                  : Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () {
                       if (_viewMode != 'event') {
                         setState(() {
                           _viewMode = 'event';
@@ -1739,29 +1875,126 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
             )
           : _error != null
               ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Text(
-                        'Error loading data',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.red,
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          _error!.contains('complete your profile') 
+                            ? Icons.person_add 
+                            : _error!.contains('Network connection') || _error!.contains('connect to server')
+                              ? Icons.cloud_off
+                              : Icons.error_outline,
+                          size: 64,
+                          color: _error!.contains('complete your profile') 
+                            ? Colors.orange 
+                            : Colors.red,
                         ),
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        _error!,
-                        style: const TextStyle(color: Colors.red),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 20),
-                      ElevatedButton(
-                        onPressed: _loadData,
-                        child: const Text('Retry'),
-                      ),
-                    ],
+                        const SizedBox(height: 20),
+                        Text(
+                          _error!.contains('complete your profile') 
+                            ? 'Complete Your Profile'
+                            : _error!.contains('Network connection')
+                              ? 'Connection Issue'
+                              : _error!.contains('connect to server')
+                                ? 'Server Unavailable'
+                                : 'Error Loading Profiles',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: _error!.contains('complete your profile') 
+                              ? Colors.orange 
+                              : Colors.red,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          _error!,
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: _error!.contains('complete your profile') 
+                              ? Colors.black87 
+                              : Colors.black87,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 24),
+                        
+                        // Action buttons
+                        if (_error!.contains('complete your profile'))
+                          ElevatedButton.icon(
+                            onPressed: () {
+                              // Navigate to profile tab (index 3)
+                              widget.navigateToTab(3);
+                            },
+                            icon: const Icon(Icons.arrow_forward),
+                            label: const Text('Go to Profile'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.orange,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 32,
+                                vertical: 16,
+                              ),
+                            ),
+                          )
+                        else
+                          ElevatedButton.icon(
+                            onPressed: _loadData,
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('Retry'),
+                            style: ElevatedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 32,
+                                vertical: 16,
+                              ),
+                            ),
+                          ),
+                        
+                        // Technical details (expandable)
+                        if (_rawError != null && _rawError != _error)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 16.0),
+                            child: ExpansionTile(
+                              title: const Text(
+                                'Technical Details',
+                                style: TextStyle(fontSize: 12, color: Colors.grey),
+                              ),
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey[100],
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      SelectableText(
+                                        'Server: ${ApiConfig.baseUrl}',
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          fontFamily: 'monospace',
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      SelectableText(
+                                        'Error: $_rawError',
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          fontFamily: 'monospace',
+                                          color: Colors.red,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
                 )
               : (_viewMode == 'event' 
@@ -1811,9 +2044,7 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
                                 Icon(
                                   _viewMode == 'solo' 
                                       ? Icons.person_off 
-                                      : _viewMode == 'group'
-                                          ? Icons.group_off
-                                          : Icons.event_busy,
+                                      : Icons.event_busy,
                                   size: 64,
                                   color: Colors.grey,
                                 ),
@@ -1821,9 +2052,7 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
                                 Text(
                                   _viewMode == 'solo' 
                                       ? 'No more solo profiles available!'
-                                      : _viewMode == 'group'
-                                          ? 'No group profiles available yet!'
-                                          : 'No events available yet!',
+                                      : 'No events available yet!',
                                   style: const TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
@@ -1835,9 +2064,7 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
                                 Text(
                                   _viewMode == 'solo' 
                                       ? 'Check back later or try adjusting your preferences.'
-                                      : _viewMode == 'group'
-                                          ? 'Group matching coming soon! Try Solo mode.'
-                                          : 'Event matching coming soon! Try Solo mode.',
+                                      : 'Check back later for events.',
                                   style: const TextStyle(
                                     fontSize: 14,
                                     color: Colors.grey,
@@ -1861,39 +2088,70 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
                   : _viewMode == 'event' 
                       ? _buildEventsList()
                       : Column(
-                      children: [
-                        Expanded(
-                          child: Center(
-                            child: GestureDetector(
-                              onTap: () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (context) => DetailedProfileScreen(
-                                      profile: _potentialMatches[_currentIndex],
-                                      showActions: true,
-                                      onProfileAction: () {
-                                        // Refresh data when returning from detailed profile
-                                        _loadData();
+                              children: [
+                                Expanded(
+                                  child: Center(
+                                    child: Dismissible(
+                                      key: ValueKey('profile_${_potentialMatches[_currentIndex]['id']}_$_currentIndex'),
+                                      direction: DismissDirection.horizontal,
+                                      onDismissed: (direction) {
+                                        if (direction == DismissDirection.endToStart) {
+                                          // Swiped left = dislike
+                                          _handleAction('dislike');
+                                        } else if (direction == DismissDirection.startToEnd) {
+                                          // Swiped right = like
+                                          _handleAction('like');
+                                        }
                                       },
-                                    ),
-                                  ),
-                                );
-                              },
-                              child: Container(
-                                width: cardWidth,
-                                height: cardWidth * 1.3,
-                                margin: const EdgeInsets.only(top: 20),
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(15),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.2),
-                                      offset: const Offset(0, 2),
-                                      blurRadius: 5,
-                                    ),
-                                  ],
-                                ),
-                                child: ClipRRect(
+                                      background: Container(
+                                        alignment: Alignment.centerLeft,
+                                        padding: const EdgeInsets.only(left: 50),
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(
+                                            colors: [Colors.green.withOpacity(0.8), Colors.transparent],
+                                          ),
+                                        ),
+                                        child: const Icon(Icons.favorite, color: Colors.white, size: 80),
+                                      ),
+                                      secondaryBackground: Container(
+                                        alignment: Alignment.centerRight,
+                                        padding: const EdgeInsets.only(right: 50),
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(
+                                            colors: [Colors.transparent, Colors.red.withOpacity(0.8)],
+                                          ),
+                                        ),
+                                        child: const Icon(Icons.close, color: Colors.white, size: 80),
+                                      ),
+                                      child: GestureDetector(
+                                        onTap: () {
+                                          Navigator.of(context).push(
+                                            MaterialPageRoute(
+                                              builder: (context) => DetailedProfileScreen(
+                                                profile: _potentialMatches[_currentIndex],
+                                                showActions: true,
+                                                onProfileAction: () {
+                                                  _loadData();
+                                                },
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                        child: Container(
+                                          width: cardWidth,
+                                          height: cardWidth * 1.3,
+                                          margin: const EdgeInsets.only(top: 20),
+                                          decoration: BoxDecoration(
+                                            borderRadius: BorderRadius.circular(15),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Colors.black.withOpacity(0.2),
+                                                offset: const Offset(0, 2),
+                                                blurRadius: 5,
+                                              ),
+                                            ],
+                                          ),
+                                          child: ClipRRect(
                                   borderRadius: BorderRadius.circular(15),
                                   child: Stack(
                                     children: [
@@ -1923,23 +2181,6 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
                                                 ),
                                               ),
                                       ),
-                                      // --- Heart/Cross Overlay Animation ---
-                                      if (_showActionOverlay && _lastAction == 'like')
-                                        Center(
-                                          child: AnimatedOpacity(
-                                            opacity: _showActionOverlay ? 1.0 : 0.0,
-                                            duration: const Duration(milliseconds: 300),
-                                            child: Icon(Icons.favorite, color: Colors.green, size: 160),
-                                          ),
-                                        ),
-                                      if (_showActionOverlay && _lastAction == 'dislike')
-                                        Center(
-                                          child: AnimatedOpacity(
-                                            opacity: _showActionOverlay ? 1.0 : 0.0,
-                                            duration: const Duration(milliseconds: 300),
-                                            child: Icon(Icons.close, color: Colors.red, size: 160),
-                                          ),
-                                        ),
                                       // Name Overlay at Top
                                       Positioned(
                                         top: 0,
@@ -1961,17 +2202,29 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
                                               topRight: Radius.circular(15),
                                             ),
                                           ),
-                                          child: Text(
-                                            _getUserName(_potentialMatches[_currentIndex]),
-                                            style: const TextStyle(
-                                              fontSize: 32,
-                                              fontWeight: FontWeight.w800,
-                                              color: Colors.white,
-                                            ),
+                                          child: Row(
+                                            children: [
+                                              const Icon(
+                                                Icons.person,
+                                                color: Colors.white,
+                                                size: 28,
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Expanded(
+                                                child: Text(
+                                                  _getUserName(_potentialMatches[_currentIndex]),
+                                                  style: const TextStyle(
+                                                    fontSize: 32,
+                                                    fontWeight: FontWeight.w800,
+                                                    color: Colors.white,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                         ),
                                       ),
-                                      // Bio Overlay at Bottom
+                                      // Description Overlay at Bottom
                                       Positioned(
                                         bottom: 0,
                                         left: 0,
@@ -1996,125 +2249,18 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
                                             crossAxisAlignment: CrossAxisAlignment.start,
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
-                                              // Age, Distance and Relationship Type Row
-                                              Row(
-                                                children: [
-                                                  // Age
-                                                  if (_potentialMatches[_currentIndex]['age'] != null)
-                                                    Container(
-                                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                                      decoration: BoxDecoration(
-                                                        color: Colors.white.withOpacity(0.2),
-                                                        borderRadius: BorderRadius.circular(12),
-                                                      ),
-                                                      child: Text(
-                                                        '${_potentialMatches[_currentIndex]['age']} years old',
-                                                        style: const TextStyle(
-                                                          fontSize: 14,
-                                                          fontWeight: FontWeight.w600,
-                                                          color: Colors.white,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  if (_potentialMatches[_currentIndex]['age'] != null)
-                                                    const SizedBox(width: 8),
-                                                  // Distance (if available in local mode)
-                                                  if (_potentialMatches[_currentIndex]['distance'] != null)
-                                                    Container(
-                                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                                      decoration: BoxDecoration(
-                                                        color: AppColors.primaryGreen.withOpacity(0.7),
-                                                        borderRadius: BorderRadius.circular(12),
-                                                      ),
-                                                      child: Row(
-                                                        mainAxisSize: MainAxisSize.min,
-                                                        children: [
-                                                          const Icon(
-                                                            Icons.location_on,
-                                                            size: 14,
-                                                            color: Colors.white,
-                                                          ),
-                                                          const SizedBox(width: 4),
-                                                          Text(
-                                                            '${_potentialMatches[_currentIndex]['distance']} km',
-                                                            style: const TextStyle(
-                                                              fontSize: 14,
-                                                              fontWeight: FontWeight.w600,
-                                                              color: Colors.white,
-                                                            ),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                    ),
-                                                  if (_potentialMatches[_currentIndex]['distance'] != null)
-                                                    const SizedBox(width: 8),
-                                                  // Relationship Type
-                                                  if (_potentialMatches[_currentIndex]['relationshipType'] != null)
-                                                    Expanded(
-                                                      child: Text(
-                                                        'Looking for: ${_getRelationshipTypesText(_potentialMatches[_currentIndex]['relationshipType'])}',
-                                                        style: const TextStyle(
-                                                          fontSize: 14,
-                                                          fontWeight: FontWeight.w600,
-                                                          color: Colors.white,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                ],
-                                              ),
-                                              const SizedBox(height: 8),
                                               // Bio
-                                              Text(
-                                                _potentialMatches[_currentIndex]['bio'] ?? 'No bio available',
-                                                style: const TextStyle(
-                                                  fontSize: 18,
-                                                  color: Colors.white,
+                                              if (_potentialMatches[_currentIndex]['bio'] != null && 
+                                                  _potentialMatches[_currentIndex]['bio'].toString().isNotEmpty)
+                                                Text(
+                                                  _potentialMatches[_currentIndex]['bio'],
+                                                  style: const TextStyle(
+                                                    fontSize: 18,
+                                                    color: Colors.white,
+                                                  ),
+                                                  maxLines: 3,
+                                                  overflow: TextOverflow.ellipsis,
                                                 ),
-                                                maxLines: 3,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                              // Matching Keywords
-                                              if (_potentialMatches[_currentIndex]['matchingKeywords'] != null && 
-                                                  (_potentialMatches[_currentIndex]['matchingKeywords'] as List).isNotEmpty) ...[
-                                                const SizedBox(height: 12),
-                                                Wrap(
-                                                  spacing: 6,
-                                                  runSpacing: 6,
-                                                  children: (_potentialMatches[_currentIndex]['matchingKeywords'] as List)
-                                                      .take(5) // Show max 5 matching keywords
-                                                      .map((keyword) => Container(
-                                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                                            decoration: BoxDecoration(
-                                                              color: AppColors.greenAccent.withOpacity(0.9),
-                                                              borderRadius: BorderRadius.circular(15),
-                                                              border: Border.all(
-                                                                color: Colors.white.withOpacity(0.3),
-                                                                width: 1,
-                                                              ),
-                                                            ),
-                                                            child: Row(
-                                                              mainAxisSize: MainAxisSize.min,
-                                                              children: [
-                                                                const Icon(
-                                                                  Icons.check_circle,
-                                                                  size: 14,
-                                                                  color: Colors.white,
-                                                                ),
-                                                                const SizedBox(width: 4),
-                                                                Text(
-                                                                  keyword.toString(),
-                                                                  style: const TextStyle(
-                                                                    fontSize: 12,
-                                                                    fontWeight: FontWeight.bold,
-                                                                    color: Colors.white,
-                                                                  ),
-                                                                ),
-                                                              ],
-                                                            ),
-                                                          ))
-                                                      .toList(),
-                                                ),
-                                              ],
                                             ],
                                           ),
                                         ),
@@ -2126,13 +2272,14 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
                             ),
                           ),
                         ),
+                      ),
                         // Action Buttons
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceAround,
                             children: [
-                              // Dislike Button
+                              // Dislike/Skip Button
                               GestureDetector(
                                 onTap: _actionLoading ? null : () => _handleAction('dislike'),
                                 child: Container(
@@ -2157,43 +2304,7 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
                                 ),
                               ),
                               
-                              // Send Message Button (Premium feature)
-                              FutureBuilder<bool>(
-                                future: PremiumService.isFeatureAvailable('like_by_message'),
-                                builder: (context, snapshot) {
-                                  final canSendMessage = snapshot.data ?? false;
-                                  
-                                  if (canSendMessage) {
-                                    return GestureDetector(
-                                      onTap: _actionLoading ? null : () => _handleAction('send_message'),
-                                      child: Container(
-                                        width: 60,
-                                        height: 60,
-                                        decoration: BoxDecoration(
-                                          color: Colors.amber[600],
-                                          borderRadius: BorderRadius.circular(30),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: Colors.black.withOpacity(0.3),
-                                              offset: const Offset(0, 2),
-                                              blurRadius: 3,
-                                            ),
-                                          ],
-                                        ),
-                                        child: const Icon(
-                                          Icons.chat_bubble,
-                                          color: Colors.white,
-                                          size: 28,
-                                        ),
-                                      ),
-                                    );
-                                  } else {
-                                    return const SizedBox.shrink();
-                                  }
-                                },
-                              ),
-                              
-                              // Like Button
+                              // Like/Request to Join Button
                               GestureDetector(
                                 onTap: _actionLoading ? null : () => _handleAction('like'),
                                 child: Container(
@@ -2224,4 +2335,4 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
                     ),
     );
   }
-} 
+}

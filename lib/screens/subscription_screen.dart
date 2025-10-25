@@ -12,7 +12,7 @@ class SubscriptionScreen extends StatefulWidget {
 class _SubscriptionScreenState extends State<SubscriptionScreen> {
   bool _isLoading = true;
   List<PaymentMethod> _availableMethods = [];
-  FlavorHelper.Flavor? _currentFlavor;
+  Flavor? _currentFlavor;
 
   @override
   void initState() {
@@ -64,9 +64,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
   String _getAppBarTitle() {
     switch (_currentFlavor) {
-      case FlavorHelper.Flavor.playstore:
+      case Flavor.playstore:
         return 'Premium Subscription (Play Store)';
-      case FlavorHelper.Flavor.fdroid:
+      case Flavor.fdroid:
         return 'Premium Subscription (F-Droid)';
       default:
         return 'Premium Subscription';
@@ -75,9 +75,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
   Color _getAppBarColor() {
     switch (_currentFlavor) {
-      case FlavorHelper.Flavor.playstore:
+      case Flavor.playstore:
         return Colors.green;
-      case FlavorHelper.Flavor.fdroid:
+      case Flavor.fdroid:
         return Colors.blue;
       default:
         return Colors.blue;
@@ -92,7 +92,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         child: Column(
           children: [
             Icon(
-              _currentFlavor == FlavorHelper.Flavor.playstore
+              _currentFlavor == Flavor.playstore
                   ? Icons.shopping_cart
                   : Icons.store,
               size: 48,
@@ -100,7 +100,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              _currentFlavor == FlavorHelper.Flavor.playstore
+              _currentFlavor == Flavor.playstore
                   ? 'Google Play Store Version'
                   : 'F-Droid Version',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
@@ -110,7 +110,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
             ),
             const SizedBox(height: 4),
             Text(
-              _currentFlavor == FlavorHelper.Flavor.playstore
+              _currentFlavor == Flavor.playstore
                   ? 'Payments processed through Google Play Billing'
                   : 'Payments processed through Stripe or Bitcoin',
               style: Theme.of(context).textTheme.bodyMedium,

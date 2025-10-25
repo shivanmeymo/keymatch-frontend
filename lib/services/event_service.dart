@@ -15,6 +15,7 @@ class EventService {
     double? longitude,
     DateTime? eventDate,
     String? eventTime,
+    int? duration,
     int? maxParticipants,
     List<String>? tags,
   }) async {
@@ -38,6 +39,7 @@ class EventService {
           'longitude': longitude,
           'eventDate': eventDate?.toIso8601String(),
           'eventTime': eventTime,
+          'duration': duration,
           'maxParticipants': maxParticipants,
           'tags': tags ?? [],
         }),
@@ -162,6 +164,7 @@ class EventService {
     double? longitude,
     DateTime? eventDate,
     String? eventTime,
+    int? duration,
     int? maxParticipants,
     String? status,
     List<String>? tags,
@@ -186,6 +189,7 @@ class EventService {
           if (longitude != null) 'longitude': longitude,
           if (eventDate != null) 'eventDate': eventDate.toIso8601String(),
           if (eventTime != null) 'eventTime': eventTime,
+          if (duration != null) 'duration': duration,
           if (maxParticipants != null) 'maxParticipants': maxParticipants,
           if (status != null) 'status': status,
           if (tags != null) 'tags': tags,
@@ -255,7 +259,7 @@ class EventService {
   // Participate in event
   static Future<Map<String, dynamic>> participateInEvent({
     required String eventId,
-    required String status, // 'interested', 'going', 'not_going', 'maybe'
+    required String status, // 'going', 'not_going', 'maybe'
   }) async {
     try {
       final token = await AuthService.getToken();

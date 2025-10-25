@@ -3,6 +3,7 @@ import 'package:key_match/services/profile_service.dart';
 import 'package:key_match/services/premium_service.dart';
 import 'package:key_match/constants/colors.dart';
 import 'package:key_match/screens/premium_features_screen.dart';
+import 'package:key_match/screens/chat_screen.dart';
 import 'package:key_match/widgets/enhanced_keyword_display.dart';
 
 class DetailedProfileScreen extends StatefulWidget {
@@ -150,7 +151,10 @@ class _DetailedProfileScreenState extends State<DetailedProfileScreen> {
         
         if (response['isMatch'] == true) {
           if (mounted) {
-            _showMatchAlert();
+            final matchId = response['matchId'] ?? response['match']?['id'];
+            if (matchId != null) {
+              _showMatchAlert(matchId);
+            }
           }
         } else {
           if (mounted) {
@@ -212,7 +216,10 @@ class _DetailedProfileScreenState extends State<DetailedProfileScreen> {
             
             if (response['isMatch'] == true) {
               if (mounted) {
-                _showMatchAlert();
+                final matchId = response['matchId'] ?? response['match']?['id'];
+                if (matchId != null) {
+                  _showMatchAlert(matchId);
+                }
               }
             } else {
               if (mounted) {
@@ -307,7 +314,7 @@ class _DetailedProfileScreenState extends State<DetailedProfileScreen> {
     );
   }
 
-  void _showMatchAlert() {
+  void _showMatchAlert(int matchId) {
     final userName = _getUserName(widget.profile);
     
     showDialog(
@@ -322,19 +329,31 @@ class _DetailedProfileScreenState extends State<DetailedProfileScreen> {
               onPressed: () {
                 Navigator.of(context).pop();
                 Navigator.of(context).pop();
-                // TODO: Navigate to chat
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Chat functionality coming soon!')),
+                // Navigate to chat screen
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => ChatScreen(
+                      matchId: matchId.toString(),
+                      userName: userName,
+                    ),
+                  ),
                 );
               },
-              child: const Text('Start Chatting'),
+              child: const Text(
+                'Start Chatting',
+                style: TextStyle(color: Colors.white),
+              ),
             ),
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
                 Navigator.of(context).pop();
               },
-              child: const Text('Keep Browsing'),
+              child: const Text(
+                'Keep Browsing',
+                style: TextStyle(color: Colors.white),
+              ),
             ),
           ],
         );
@@ -368,7 +387,7 @@ class _DetailedProfileScreenState extends State<DetailedProfileScreen> {
           // Image Gallery Section at the top
           if (allImages.isNotEmpty) ...[
             Container(
-              height: 300,
+              height: 450,
               width: double.infinity,
               child: PageView.builder(
                 controller: _pageController,

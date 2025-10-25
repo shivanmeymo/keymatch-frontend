@@ -164,6 +164,7 @@ class _PlatformPaymentWidgetState extends State<PlatformPaymentWidget> {
         Card(
           clipBehavior: Clip.hardEdge,
           child: Padding(
+            padding: const EdgeInsets.all(16.0),
             child: ConstrainedBox(
               constraints: BoxConstraints(maxWidth: 400),
               child: Column(
@@ -213,6 +214,7 @@ class _PlatformPaymentWidgetState extends State<PlatformPaymentWidget> {
         Card(
           clipBehavior: Clip.hardEdge,
           child: Padding(
+            padding: const EdgeInsets.all(16.0),
             child: ConstrainedBox(
               constraints: BoxConstraints(maxWidth: 400),
               child: Column(
