@@ -10,14 +10,13 @@ class EventService {
   static Future<Map<String, dynamic>> createEvent({
     required String name,
     String? description,
-    String? location,
-    double? latitude,
-    double? longitude,
     DateTime? eventDate,
     String? eventTime,
     int? duration,
     int? maxParticipants,
     List<String>? tags,
+    bool isPublic = true,
+    List<int>? invitedUserIds,
   }) async {
     try {
       final token = await AuthService.getToken();
@@ -34,14 +33,13 @@ class EventService {
         body: json.encode({
           'name': name,
           'description': description,
-          'location': location,
-          'latitude': latitude,
-          'longitude': longitude,
           'eventDate': eventDate?.toIso8601String(),
           'eventTime': eventTime,
           'duration': duration,
           'maxParticipants': maxParticipants,
           'tags': tags ?? [],
+          'isPublic': isPublic,
+          if (invitedUserIds != null) 'invitedUserIds': invitedUserIds,
         }),
       );
 
@@ -159,9 +157,6 @@ class EventService {
     required String eventId,
     String? name,
     String? description,
-    String? location,
-    double? latitude,
-    double? longitude,
     DateTime? eventDate,
     String? eventTime,
     int? duration,
@@ -184,9 +179,6 @@ class EventService {
         body: json.encode({
           if (name != null) 'name': name,
           if (description != null) 'description': description,
-          if (location != null) 'location': location,
-          if (latitude != null) 'latitude': latitude,
-          if (longitude != null) 'longitude': longitude,
           if (eventDate != null) 'eventDate': eventDate.toIso8601String(),
           if (eventTime != null) 'eventTime': eventTime,
           if (duration != null) 'duration': duration,
@@ -414,6 +406,52 @@ class EventService {
         'success': false,
         'message': 'Network error: $e',
         'participations': [],
+      };
+    }
+  }
+
+  // Message event creator
+  static Future<Map<String, dynamic>> messageEventCreator({
+    required String eventId,
+    required String message,
+  }) async {
+    try {
+      final token = await AuthService.getToken();
+      if (token == null) {
+        throw Exception('No authentication token');
+      }
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/events/$eventId/message-creator'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: json.encode({
+          'message': message,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final body = json.decode(response.body);
+        return {
+          'success': true,
+          'message': body['message'] ?? 'Match created successfully',
+          'match': body['match'],
+          'messageId': body['messageId'],
+        };
+      } else {
+        final body = json.decode(response.body);
+        return {
+          'success': false,
+          'message': body['error'] ?? 'Failed to message event creator',
+        };
+      }
+    } catch (e) {
+      print('Error messaging event creator: $e');
+      return {
+        'success': false,
+        'message': 'Network error: $e',
       };
     }
   }

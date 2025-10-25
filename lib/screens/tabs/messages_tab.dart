@@ -1,11 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../services/match_service.dart';
 import '../../services/profile_service.dart';
-import '../../services/group_service.dart';
 import '../chat_screen.dart';
 import '../detailed_profile_screen.dart';
-import '../group_chat_screen.dart';
-import '../create_group_screen.dart';
 import '../../constants/colors.dart';
 
 class MessagesTab extends StatefulWidget {
@@ -20,7 +17,6 @@ class MessagesTab extends StatefulWidget {
 class _MessagesTabState extends State<MessagesTab> {
   List<Map<String, dynamic>> _matches = [];
   List<Map<String, dynamic>> _pendingMessages = [];
-  List<Map<String, dynamic>> _groups = [];
   bool _isLoading = true;
   String? _error;
 
@@ -37,21 +33,18 @@ class _MessagesTabState extends State<MessagesTab> {
         _error = null;
       });
 
-      print('🔍 Loading matches, pending messages, and groups...');
+      print('🔍 Loading matches and pending messages...');
       
-      // Load active matches, pending messages, and groups
+      // Load active matches and pending messages
       final matches = await MatchService.getMatchesWithLastMessage();
       final pendingMessages = await MatchService.getPendingMessages();
-      final groups = await GroupService.getGroups();
       
       print('✅ Matches loaded successfully: ${matches.length} matches');
       print('✅ Pending messages loaded successfully: ${pendingMessages.length} pending');
-      print('✅ Groups loaded successfully: ${groups.length} groups');
       
       setState(() {
         _matches = matches;
         _pendingMessages = pendingMessages;
-        _groups = groups;
         _isLoading = false;
       });
     } catch (e) {
@@ -189,20 +182,6 @@ class _MessagesTabState extends State<MessagesTab> {
         elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.group_add, color: Colors.white),
-            onPressed: () async {
-              // Navigate to create group screen
-              await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const CreateGroupScreen(),
-                ),
-              );
-              // Refresh after returning
-              _loadMatches();
-            },
-          ),
-          IconButton(
             icon: const Icon(Icons.refresh, color: Colors.white),
             onPressed: _loadMatches,
           ),
@@ -254,7 +233,7 @@ class _MessagesTabState extends State<MessagesTab> {
                     ],
                   ),
                 )
-              : _matches.isEmpty && _pendingMessages.isEmpty && _groups.isEmpty
+              : _matches.isEmpty && _pendingMessages.isEmpty
                   ? Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -302,14 +281,8 @@ class _MessagesTabState extends State<MessagesTab> {
                   : RefreshIndicator(
                       onRefresh: _loadMatches,
                       child: ListView.builder(
-                        itemCount: _groups.length + _matches.length + _pendingMessages.length,
+                        itemCount: _matches.length + _pendingMessages.length,
                         itemBuilder: (context, index) {
-                          // First show groups
-                          if (index < _groups.length) {
-                            return _buildGroupItem(_groups[index]);
-                          }
-                          // Adjust index for matches and pending messages
-                          index = index - _groups.length;
                           if (index < _matches.length) {
                             final match = _matches[index];
                             final profile = match['profile'];
@@ -653,97 +626,6 @@ class _MessagesTabState extends State<MessagesTab> {
                         },
                       ),
                     ),
-    );
-  }
-
-  Widget _buildGroupItem(Map<String, dynamic> group) {
-    final groupName = group['name'] ?? 'Unnamed Group';
-    final members = group['members'] as List<dynamic>? ?? [];
-    final memberCount = members.length;
-    
-    // Get last message info
-    String lastMessageText = 'No messages yet';
-    String lastMessageTime = '';
-    
-    if (group['lastMessage'] != null) {
-      final lastMessage = group['lastMessage'];
-      final senderFirstName = lastMessage['sender']['firstName'];
-      lastMessageText = '$senderFirstName: ${lastMessage['content']}';
-      lastMessageTime = _formatTimestamp(lastMessage['timestamp']);
-    }
-
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: ListTile(
-        leading: CircleAvatar(
-          radius: 25,
-          backgroundColor: AppColors.primaryGreen,
-          child: const Icon(
-            Icons.group,
-            color: Colors.white,
-            size: 25,
-          ),
-        ),
-        title: Row(
-          children: [
-            Expanded(
-              child: Text(
-                groupName,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: AppColors.tintColorLight.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                '$memberCount members',
-                style: TextStyle(
-                  color: AppColors.tintColorLight,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ],
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              lastMessageText,
-              style: const TextStyle(
-                color: Colors.white,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            if (lastMessageTime.isNotEmpty)
-              Text(
-                lastMessageTime,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[500],
-                ),
-              ),
-          ],
-        ),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => GroupChatScreen(
-                groupId: group['id'].toString(),
-                groupName: groupName,
-              ),
-            ),
-          ).then((_) => _loadMatches());
-        },
-      ),
     );
   }
 } 

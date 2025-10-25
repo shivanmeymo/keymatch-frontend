@@ -4,6 +4,7 @@ import 'package:key_match/services/auth_service.dart';
 import 'package:key_match/services/premium_service.dart';
 import 'package:key_match/services/event_service.dart';
 import 'package:key_match/services/location_service.dart';
+import 'package:key_match/services/match_service.dart';
 import 'package:key_match/screens/detailed_profile_screen.dart';
 import 'package:key_match/screens/premium_features_screen.dart';
 import 'package:key_match/screens/chat_screen.dart';
@@ -718,29 +719,8 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
                           fontSize: 14,
                           color: Colors.white,
                         ),
-                        maxLines: 2,
+                        maxLines: 3,
                         overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                    // Location
-                    if (event['location'] != null && event['location'].toString().isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          const Icon(Icons.place, size: 16, color: Colors.white70),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              event['location'],
-                              style: const TextStyle(
-                                fontSize: 14,
-                                color: Colors.white,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
                       ),
                     ],
                   ],
@@ -812,6 +792,62 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
         title: Row(
           children: [
             Expanded(child: Text(event['name'] ?? 'Event Details')),
+            if (!isParticipating && !isCreator)
+              ElevatedButton.icon(
+                onPressed: () async {
+                  Navigator.of(context).pop();
+                  final result = await EventService.participateInEvent(
+                    eventId: event['id'].toString(),
+                    status: 'going',
+                  );
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(result['success'] == true 
+                            ? 'You are now attending this event!'
+                            : result['message'] ?? 'Failed to join event'),
+                        backgroundColor: result['success'] == true 
+                            ? Colors.green 
+                            : Colors.red,
+                      ),
+                    );
+                    if (result['success'] == true) {
+                      _loadData();
+                    }
+                  }
+                },
+                icon: const Icon(Icons.check, size: 16),
+                label: const Text('Join', style: TextStyle(fontSize: 12)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryGreen,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  minimumSize: Size.zero,
+                ),
+              ),
+            if (userStatus != null)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryGreen,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.check_circle, color: Colors.white, size: 14),
+                    const SizedBox(width: 4),
+                    Text(
+                      userStatus == 'going' ? 'Attending' : userStatus,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             if (isCreator)
               IconButton(
                 icon: const Icon(Icons.edit, color: Colors.white),
@@ -851,13 +887,6 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
                   'Time',
                   event['eventTime'].substring(0, 5),
                 ),
-              // Location
-              if (event['location'] != null)
-                _buildDetailRow(
-                  Icons.place,
-                  'Location',
-                  event['location'],
-                ),
               // Distance
               if (event['distance'] != null)
                 _buildDetailRow(
@@ -892,14 +921,6 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
               // Attendees List
               if (isParticipating || isCreator) ...[
                 const SizedBox(height: 12),
-                const Text(
-                  'Attendees:',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
                 TextButton.icon(
                   onPressed: () {
                     _showAttendeesDialog(event);
@@ -909,29 +930,9 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
                     'View $participantCount ${participantCount == 1 ? 'attendee' : 'attendees'}',
                     style: const TextStyle(color: Colors.white),
                   ),
-                ),
-              ],
-              // Current status
-              if (userStatus != null) ...[
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryGreen,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.check_circle, color: Colors.white, size: 20),
-                      const SizedBox(width: 8),
-                      Text(
-                        'You are ${userStatus == 'going' ? 'attending' : userStatus}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
+                  style: TextButton.styleFrom(
+                    alignment: Alignment.centerLeft,
+                    padding: EdgeInsets.zero,
                   ),
                 ),
               ],
@@ -939,61 +940,20 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
           ),
         ),
         actions: [
-          // Message Creator button (for participants, not the creator themselves)
-          if (isParticipating && !isCreator && creator != null)
+          // Message Creator button (for anyone except the creator themselves)
+          if (!isCreator && creator != null)
             TextButton.icon(
               onPressed: () {
                 Navigator.of(context).pop();
-                // Navigate to chat with event creator
-                final creatorName = '${creator['firstName']} ${creator['lastName']}'.trim();
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => ChatScreen(
-                      matchId: 'event_${event['id']}_${creator['id']}', // Temporary ID for event-based chats
-                      userName: creatorName,
-                    ),
-                  ),
-                );
+                _showMessageCreatorDialog(event);
               },
-              icon: const Icon(Icons.message, color: Colors.white),
+              icon: const Icon(Icons.chat, color: Colors.white),
               label: const Text(
-                'Message Creator',
+                'Chat with Creator',
                 style: TextStyle(color: Colors.white),
               ),
             ),
-          if (!isParticipating)
-            ElevatedButton.icon(
-              onPressed: () async {
-                Navigator.of(context).pop();
-                final result = await EventService.participateInEvent(
-                  eventId: event['id'].toString(),
-                  status: 'going',
-                );
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(result['success'] == true 
-                          ? 'You are now attending this event!'
-                          : result['message'] ?? 'Failed to join event'),
-                      backgroundColor: result['success'] == true 
-                          ? Colors.green 
-                          : Colors.red,
-                    ),
-                  );
-                  if (result['success'] == true) {
-                    _loadData();
-                  }
-                }
-              },
-              icon: const Icon(Icons.check),
-              label: const Text('Join Event'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryGreen,
-                foregroundColor: Colors.white,
-              ),
-            )
-          else
+          if (isParticipating)
             TextButton.icon(
               onPressed: () async {
                 Navigator.of(context).pop();
@@ -1024,7 +984,10 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
             ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Close'),
+            child: const Text(
+              'Close',
+              style: TextStyle(color: Colors.white),
+            ),
           ),
         ],
       ),
@@ -1059,7 +1022,6 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
   void _showEditEventDialog(Map<String, dynamic> event) {
     final TextEditingController nameController = TextEditingController(text: event['name']);
     final TextEditingController descriptionController = TextEditingController(text: event['description'] ?? '');
-    final TextEditingController locationController = TextEditingController(text: event['location'] ?? '');
     DateTime? selectedDate = event['eventDate'] != null ? DateTime.parse(event['eventDate']) : null;
     TimeOfDay? selectedTime;
     
@@ -1072,13 +1034,10 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
       );
     }
     
-    double? eventLatitude = event['latitude'] != null ? double.tryParse(event['latitude'].toString()) : null;
-    double? eventLongitude = event['longitude'] != null ? double.tryParse(event['longitude'].toString()) : null;
-    
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
+        builder: (context, setDialogState) => AlertDialog(
           title: Row(
             children: [
               Icon(Icons.edit, color: AppColors.primaryGreen),
@@ -1091,11 +1050,6 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Update your event details',
-                  style: TextStyle(fontSize: 14, color: Colors.grey),
-                ),
-                const SizedBox(height: 20),
                 TextField(
                   controller: nameController,
                   decoration: InputDecoration(
@@ -1113,62 +1067,14 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
                   controller: descriptionController,
                   decoration: InputDecoration(
                     labelText: 'Description',
-                    hintText: 'What will happen at this event?',
+                    hintText: 'Include location, details, what will happen...',
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
                     prefixIcon: const Icon(Icons.description),
                   ),
-                  maxLines: 3,
-                  maxLength: 200,
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: locationController,
-                        decoration: InputDecoration(
-                          labelText: 'Location',
-                          hintText: 'Enter address or place name',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          prefixIcon: const Icon(Icons.location_on),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      onPressed: () async {
-                        try {
-                          final location = await LocationService.getCurrentLocation();
-                          if (location != null) {
-                            setState(() {
-                              eventLatitude = location['latitude'];
-                              eventLongitude = location['longitude'];
-                            });
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Current location set'),
-                                backgroundColor: Colors.green,
-                                duration: Duration(seconds: 1),
-                              ),
-                            );
-                          }
-                        } catch (e) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Failed to get location: $e'),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
-                        }
-                      },
-                      icon: Icon(Icons.my_location, color: AppColors.textPrimaryLight),
-                      tooltip: 'Use current GPS location',
-                    ),
-                  ],
+                  maxLines: 4,
+                  maxLength: 300,
                 ),
                 const SizedBox(height: 16),
                 Row(
@@ -1183,7 +1089,7 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
                             lastDate: DateTime.now().add(const Duration(days: 365)),
                           );
                           if (date != null) {
-                            setState(() => selectedDate = date);
+                            setDialogState(() => selectedDate = date);
                           }
                         },
                         style: OutlinedButton.styleFrom(
@@ -1208,7 +1114,7 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
                             initialTime: selectedTime ?? TimeOfDay.now(),
                           );
                           if (time != null) {
-                            setState(() => selectedTime = time);
+                            setDialogState(() => selectedTime = time);
                           }
                         },
                         style: OutlinedButton.styleFrom(
@@ -1265,11 +1171,6 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
                   description: descriptionController.text.trim().isEmpty 
                       ? null 
                       : descriptionController.text.trim(),
-                  location: locationController.text.trim().isEmpty 
-                      ? null 
-                      : locationController.text.trim(),
-                  latitude: eventLatitude,
-                  longitude: eventLongitude,
                   eventDate: selectedDate,
                   eventTime: selectedTime != null 
                       ? '${selectedTime!.hour.toString().padLeft(2, '0')}:${selectedTime!.minute.toString().padLeft(2, '0')}:00'
@@ -1453,20 +1354,130 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
     );
   }
 
-  void _showCreateEventDialog() {
-    final TextEditingController nameController = TextEditingController();
-    final TextEditingController descriptionController = TextEditingController();
-    final TextEditingController locationController = TextEditingController();
-    final TextEditingController durationController = TextEditingController();
-    DateTime? selectedDate;
-    TimeOfDay? selectedTime;
-    double? eventLatitude;
-    double? eventLongitude;
+  void _showInvitePeopleDialog(BuildContext context, List<Map<String, dynamic>> matches, Set<int> selectedMatchIds, StateSetter setParentState) {
+    print('=== INVITE PEOPLE DEBUG ===');
+    print('Total matches: ${matches.length}');
+    if (matches.isNotEmpty) {
+      print('First match structure: ${matches.first}');
+      print('First match profile: ${matches.first['profile']}');
+      if (matches.first['profile'] != null) {
+        print('First match user: ${matches.first['profile']['user']}');
+      }
+    }
     
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.person_add, color: Colors.white),
+              SizedBox(width: 8),
+              Text('Invite People'),
+            ],
+          ),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: matches.isEmpty
+                ? const Padding(
+                    padding: EdgeInsets.all(16.0),
+                    child: Text(
+                      'No matches available to invite',
+                      style: TextStyle(color: Colors.white70),
+                      textAlign: TextAlign.center,
+                    ),
+                  )
+                : ListView.builder(
+                          shrinkWrap: true,
+                          itemCount: matches.length,
+                          itemBuilder: (context, index) {
+                            final match = matches[index];
+                            final profile = match['profile'];
+                            // Try multiple paths to get userId
+                            final userId = profile?['user']?['id'] ?? 
+                                          profile?['userId'] ??
+                                          match['profile']?['user']?['id'];
+                            final userName = profile != null && profile['user'] != null
+                                ? '${profile['user']['firstName']} ${profile['user']['lastName']}'
+                                : 'Unknown';
+                            
+                            print('Match $index - Checking all paths:');
+                            print('  profile[user][id]: ${profile?['user']?['id']}');
+                            print('  profile[userId]: ${profile?['userId']}');
+                            print('  Final userId: $userId');
+                            print('  userName: $userName');
+                            
+                            if (userId == null) {
+                              print('Skipping match $index - userId is null after all attempts');
+                              return const SizedBox.shrink();
+                            }
+                            
+                            final isSelected = selectedMatchIds.contains(userId);
+                            
+                            return CheckboxListTile(
+                              dense: true,
+                              value: isSelected,
+                              onChanged: (bool? value) {
+                                setDialogState(() {
+                                  setParentState(() {
+                                    if (value == true) {
+                                      selectedMatchIds.add(userId);
+                                    } else {
+                                      selectedMatchIds.remove(userId);
+                                    }
+                                  });
+                                });
+                              },
+                              title: Text(
+                                userName,
+                                style: const TextStyle(color: Colors.white, fontSize: 14),
+                              ),
+                              activeColor: AppColors.primaryGreen,
+                              checkColor: Colors.white,
+                              controlAffinity: ListTileControlAffinity.leading,
+                            );
+                          },
+                        ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text(
+                'Done',
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showCreateEventDialog() async {
+    final TextEditingController nameController = TextEditingController();
+    final TextEditingController descriptionController = TextEditingController();
+    final TextEditingController durationController = TextEditingController();
+    
+    // Load matches for invitation
+    List<Map<String, dynamic>> matches = [];
+    try {
+      matches = await MatchService.getMatches();
+    } catch (e) {
+      print('Error loading matches: $e');
+    }
+    
+    if (!mounted) return;
+    
+    showDialog(
+      context: context,
+      builder: (context) {
+        DateTime? selectedDate;
+        TimeOfDay? selectedTime;
+        bool isPublicEvent = true;
+        Set<int> selectedMatchIds = {};
+        
+        return StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
           title: Row(
             children: [
               Icon(Icons.event_available, color: AppColors.primaryGreen),
@@ -1479,11 +1490,6 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Organize an event and invite people to join!',
-                  style: TextStyle(fontSize: 14, color: Colors.grey),
-                ),
-                const SizedBox(height: 20),
                 TextField(
                   controller: nameController,
                   decoration: InputDecoration(
@@ -1501,63 +1507,14 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
                   controller: descriptionController,
                   decoration: InputDecoration(
                     labelText: 'Description',
-                    hintText: 'What will happen at this event?',
+                    hintText: 'Include location, details, what will happen...',
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
                     prefixIcon: const Icon(Icons.description),
                   ),
-                  maxLines: 3,
-                  maxLength: 200,
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: locationController,
-                        decoration: InputDecoration(
-                          labelText: 'Location',
-                          hintText: 'Enter address or place name',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          prefixIcon: const Icon(Icons.location_on),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      onPressed: () async {
-                        try {
-                          final location = await LocationService.getCurrentLocation();
-                          if (location != null) {
-                            setState(() {
-                              eventLatitude = location['latitude'];
-                              eventLongitude = location['longitude'];
-                            });
-                            // Show confirmation
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Current location set'),
-                                backgroundColor: Colors.green,
-                                duration: Duration(seconds: 1),
-                              ),
-                            );
-                          }
-                        } catch (e) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Failed to get location: $e'),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
-                        }
-                      },
-                      icon: Icon(Icons.my_location, color: AppColors.textPrimaryLight),
-                      tooltip: 'Use current GPS location',
-                    ),
-                  ],
+                  maxLines: 4,
+                  maxLength: 300,
                 ),
                 const SizedBox(height: 16),
                 TextField(
@@ -1574,6 +1531,84 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
                   maxLength: 4,
                 ),
                 const SizedBox(height: 16),
+                // Event Visibility Toggle
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.white, width: 1.5),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        isPublicEvent ? Icons.public : Icons.lock,
+                        color: Colors.white,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              isPublicEvent ? 'Public Event' : 'Private Event',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                                color: Colors.white,
+                              ),
+                            ),
+                            Text(
+                              isPublicEvent 
+                                  ? 'Anyone can see and join this event'
+                                  : 'Only invited people can see this event',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Colors.white70,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Switch(
+                        value: isPublicEvent,
+                        onChanged: (value) {
+                          setDialogState(() {
+                            isPublicEvent = value;
+                          });
+                        },
+                        thumbColor: WidgetStateProperty.all(Colors.white),
+                        trackColor: WidgetStateProperty.resolveWith((states) {
+                          if (states.contains(WidgetState.selected)) {
+                            return AppColors.primaryGreen;
+                          }
+                          return Colors.grey.shade700;
+                        }),
+                        trackOutlineColor: WidgetStateProperty.all(Colors.white),
+                      ),
+                    ],
+                  ),
+                ),
+                                  const SizedBox(height: 16),
+                  // Invite people button (only for private events)
+                  if (!isPublicEvent) ...[
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        _showInvitePeopleDialog(context, matches, selectedMatchIds, setDialogState);
+                      },
+                      icon: const Icon(Icons.person_add, color: Colors.white),
+                      label: Text(
+                        selectedMatchIds.isEmpty 
+                          ? 'Invite People'
+                          : 'Invite People (${selectedMatchIds.length} selected)',
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Colors.white),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
                 Row(
                   children: [
                     Expanded(
@@ -1586,19 +1621,19 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
                             lastDate: DateTime.now().add(const Duration(days: 365)),
                           );
                           if (date != null) {
-                            setState(() => selectedDate = date);
+                            setDialogState(() => selectedDate = date);
                           }
                         },
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.textPrimaryLight,
-                          side: BorderSide(color: AppColors.textPrimaryLight),
+                          foregroundColor: Colors.white,
+                          side: const BorderSide(color: Colors.white),
                         ),
-                        icon: Icon(Icons.calendar_today, color: AppColors.textPrimaryLight),
+                        icon: const Icon(Icons.calendar_today, color: Colors.white),
                         label: Text(
                           selectedDate != null
                               ? '${selectedDate!.day}/${selectedDate!.month}/${selectedDate!.year}'
                               : 'Select Date',
-                          style: TextStyle(color: AppColors.textPrimaryLight),
+                          style: const TextStyle(color: Colors.white),
                         ),
                       ),
                     ),
@@ -1611,19 +1646,19 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
                             initialTime: TimeOfDay.now(),
                           );
                           if (time != null) {
-                            setState(() => selectedTime = time);
+                            setDialogState(() => selectedTime = time);
                           }
                         },
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.textPrimaryLight,
-                          side: BorderSide(color: AppColors.textPrimaryLight),
+                          foregroundColor: Colors.white,
+                          side: const BorderSide(color: Colors.white),
                         ),
-                        icon: Icon(Icons.access_time, color: AppColors.textPrimaryLight),
+                        icon: const Icon(Icons.access_time, color: Colors.white),
                         label: Text(
                           selectedTime != null
                               ? '${selectedTime!.hour}:${selectedTime!.minute.toString().padLeft(2, '0')}'
                               : 'Select Time',
-                          style: TextStyle(color: AppColors.textPrimaryLight),
+                          style: const TextStyle(color: Colors.white),
                         ),
                       ),
                     ),
@@ -1635,10 +1670,10 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              style: TextButton.styleFrom(
-                foregroundColor: AppColors.textPrimaryLight,
+              child: const Text(
+                'Cancel',
+                style: TextStyle(color: Colors.white),
               ),
-              child: const Text('Cancel'),
             ),
             ElevatedButton(
               onPressed: () async {
@@ -1668,11 +1703,6 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
                   description: descriptionController.text.trim().isEmpty 
                       ? null 
                       : descriptionController.text.trim(),
-                  location: locationController.text.trim().isEmpty 
-                      ? null 
-                      : locationController.text.trim(),
-                  latitude: eventLatitude,
-                  longitude: eventLongitude,
                   eventDate: selectedDate,
                   eventTime: selectedTime != null 
                       ? '${selectedTime!.hour.toString().padLeft(2, '0')}:${selectedTime!.minute.toString().padLeft(2, '0')}:00'
@@ -1680,6 +1710,8 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
                   duration: durationController.text.trim().isEmpty 
                       ? null 
                       : int.tryParse(durationController.text.trim()),
+                  isPublic: isPublicEvent,
+                  invitedUserIds: isPublicEvent ? null : selectedMatchIds.toList(),
                 );
                 
                 if (mounted) {
@@ -1710,7 +1742,8 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
             ),
           ],
         ),
-      ),
+        );
+      },
     );
   }
 
@@ -2334,5 +2367,94 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
                       ],
                     ),
     );
+  }
+
+  Future<void> _showMessageCreatorDialog(Map<String, dynamic> event) async {
+    final creator = event['creator'];
+    final creatorName = creator != null 
+        ? '${creator['firstName']} ${creator['lastName']}'.trim()
+        : 'Event Creator';
+
+    // Get creator's profile picture
+    String? creatorProfilePicture;
+    if (creator != null) {
+      // Try to get from user's profile data
+      final creatorProfile = creator['profile'];
+      if (creatorProfile != null) {
+        // Try profile images first
+        if (creatorProfile['images'] != null && creatorProfile['images'].isNotEmpty) {
+          creatorProfilePicture = ProfileService.getFullImageUrl(creatorProfile['images'][0]['imageUrl']);
+        } else if (creatorProfile['profilePicture'] != null && creatorProfile['profilePicture'].isNotEmpty) {
+          creatorProfilePicture = ProfileService.getFullImageUrl(creatorProfile['profilePicture']);
+        }
+      }
+      // Fallback to user-level fields
+      if (creatorProfilePicture == null) {
+        if (creator['images'] != null && creator['images'].isNotEmpty) {
+          creatorProfilePicture = ProfileService.getFullImageUrl(creator['images'][0]['imageUrl']);
+        } else if (creator['profilePicture'] != null && creator['profilePicture'].isNotEmpty) {
+          creatorProfilePicture = ProfileService.getFullImageUrl(creator['profilePicture']);
+        }
+      }
+    }
+
+    // Show loading indicator
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+            ),
+            const SizedBox(width: 16),
+            Text('Opening chat with $creatorName...'),
+          ],
+        ),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+
+    // Create match without a message
+    final result = await EventService.messageEventCreator(
+      eventId: event['id'].toString(),
+      message: '', // Empty message - just create the match
+    );
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).clearSnackBars();
+      
+      if (result['success'] == true) {
+        final match = result['match'];
+        if (match != null) {
+          // Navigate to chat screen with profile picture
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ChatScreen(
+                matchId: match['id'].toString(),
+                userName: creatorName,
+                userProfilePicture: creatorProfilePicture,
+              ),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Match created! Check your Messages tab to chat with $creatorName.'),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message'] ?? 'Failed to create match'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
   }
 }
