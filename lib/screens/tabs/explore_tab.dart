@@ -2269,9 +2269,13 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
                                           margin: const EdgeInsets.only(top: 20),
                                           decoration: BoxDecoration(
                                             borderRadius: BorderRadius.circular(15),
+                                            border: Border.all(
+                                              color: AppColors.primaryGreen,
+                                              width: 3,
+                                            ),
                                             boxShadow: [
                                               BoxShadow(
-                                                color: Colors.black.withOpacity(0.2),
+                                                color: Colors.black.withOpacity(0.1),
                                                 offset: const Offset(0, 2),
                                                 blurRadius: 5,
                                               ),

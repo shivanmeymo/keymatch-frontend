@@ -314,6 +314,10 @@ class _MessagesTabState extends State<MessagesTab> {
                             
                             return Card(
                               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                side: BorderSide(color: AppColors.primaryGreenLightest, width: 1),
+                              ),
                               child: ListTile(
                                 leading: GestureDetector(
                                   onTap: () {
@@ -481,6 +485,10 @@ class _MessagesTabState extends State<MessagesTab> {
 
                             return Card(
                               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                side: BorderSide(color: AppColors.primaryGreenLightest, width: 1),
+                              ),
                               child: ListTile(
                                 leading: GestureDetector(
                                   onTap: () {
