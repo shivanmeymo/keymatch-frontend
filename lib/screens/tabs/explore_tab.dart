@@ -953,7 +953,7 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
                 style: TextStyle(color: Colors.white),
               ),
             ),
-          if (isParticipating)
+          if (isParticipating && !isCreator)
             TextButton.icon(
               onPressed: () async {
                 Navigator.of(context).pop();
@@ -1038,11 +1038,12 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: AppColors.primaryGreen,
           title: Row(
             children: [
-              Icon(Icons.edit, color: AppColors.primaryGreen),
+              const Icon(Icons.edit, color: Colors.white),
               const SizedBox(width: 8),
-              const Text('Edit Event'),
+              const Text('Edit Event', style: TextStyle(color: Colors.white)),
             ],
           ),
           content: SingleChildScrollView(
@@ -1052,29 +1053,51 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
               children: [
                 TextField(
                   controller: nameController,
+                  style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(
                     labelText: 'Event Name',
+                    labelStyle: const TextStyle(color: Colors.white70),
                     hintText: 'e.g., Coffee Meetup',
+                    hintStyle: const TextStyle(color: Colors.white38),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: Colors.white),
                     ),
-                    prefixIcon: const Icon(Icons.event),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: Colors.white70),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: Colors.white, width: 2),
+                    ),
+                    prefixIcon: const Icon(Icons.event, color: Colors.white),
                   ),
-                  maxLength: 50,
                 ),
                 const SizedBox(height: 16),
                 TextField(
                   controller: descriptionController,
+                  style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(
                     labelText: 'Description',
+                    labelStyle: const TextStyle(color: Colors.white70),
                     hintText: 'Include location, details, what will happen...',
+                    hintStyle: const TextStyle(color: Colors.white38),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: Colors.white),
                     ),
-                    prefixIcon: const Icon(Icons.description),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: Colors.white70),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: Colors.white, width: 2),
+                    ),
+                    prefixIcon: const Icon(Icons.description, color: Colors.white),
                   ),
                   maxLines: 4,
-                  maxLength: 300,
                 ),
                 const SizedBox(height: 16),
                 Row(
@@ -1093,15 +1116,15 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
                           }
                         },
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.textPrimaryLight,
-                          side: BorderSide(color: AppColors.textPrimaryLight),
+                          foregroundColor: Colors.white,
+                          side: const BorderSide(color: Colors.white),
                         ),
-                        icon: Icon(Icons.calendar_today, color: AppColors.textPrimaryLight),
+                        icon: const Icon(Icons.calendar_today, color: Colors.white),
                         label: Text(
                           selectedDate != null
                               ? '${selectedDate!.day}/${selectedDate!.month}/${selectedDate!.year}'
                               : 'Select Date',
-                          style: TextStyle(color: AppColors.textPrimaryLight),
+                          style: const TextStyle(color: Colors.white),
                         ),
                       ),
                     ),
@@ -1118,15 +1141,15 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
                           }
                         },
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.textPrimaryLight,
-                          side: BorderSide(color: AppColors.textPrimaryLight),
+                          foregroundColor: Colors.white,
+                          side: const BorderSide(color: Colors.white),
                         ),
-                        icon: Icon(Icons.access_time, color: AppColors.textPrimaryLight),
+                        icon: const Icon(Icons.access_time, color: Colors.white),
                         label: Text(
                           selectedTime != null
                               ? '${selectedTime!.hour}:${selectedTime!.minute.toString().padLeft(2, '0')}'
                               : 'Select Time',
-                          style: TextStyle(color: AppColors.textPrimaryLight),
+                          style: const TextStyle(color: Colors.white),
                         ),
                       ),
                     ),
@@ -1136,10 +1159,81 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
             ),
           ),
           actions: [
+            // Delete button on the left
+            TextButton.icon(
+              onPressed: () async {
+                // Confirm deletion
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    backgroundColor: Colors.white,
+                    title: const Text('Delete Event', style: TextStyle(color: Colors.black87)),
+                    content: const Text(
+                      'Are you sure you want to delete this event? This action cannot be undone.',
+                      style: TextStyle(color: Colors.black87),
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(false),
+                        child: Text('Cancel', style: TextStyle(color: Colors.grey[700])),
+                      ),
+                      ElevatedButton(
+                        onPressed: () => Navigator.of(context).pop(true),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                          foregroundColor: Colors.white,
+                        ),
+                        child: const Text('Delete'),
+                      ),
+                    ],
+                  ),
+                );
+                
+                if (confirm == true) {
+                  Navigator.of(context).pop(); // Close edit dialog
+                  
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Deleting event...'),
+                      duration: Duration(seconds: 1),
+                    ),
+                  );
+                  
+                  // Call API to delete event
+                  final result = await EventService.deleteEvent(event['id'].toString());
+                  
+                  if (mounted) {
+                    if (result['success'] == true) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Event deleted successfully!'),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                      _loadData();
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(result['message'] ?? 'Failed to delete event'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                  }
+                }
+              },
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.white,
+                backgroundColor: Colors.red,
+              ),
+              icon: const Icon(Icons.delete, color: Colors.white),
+              label: const Text('Delete'),
+            ),
+            const Spacer(),
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
               style: TextButton.styleFrom(
-                foregroundColor: AppColors.textPrimaryLight,
+                foregroundColor: Colors.white,
               ),
               child: const Text('Cancel'),
             ),
@@ -1197,8 +1291,8 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
                 }
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryGreen,
-                foregroundColor: Colors.white,
+                backgroundColor: Colors.white,
+                foregroundColor: AppColors.primaryGreen,
               ),
               child: const Text('Update'),
             ),
@@ -1297,7 +1391,7 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
                         : Icons.help_outline;
                     
                     final statusColor = status == 'going'
-                        ? Colors.green
+                        ? Colors.white
                         : Colors.orange;
                     
                     return ListTile(
@@ -1500,7 +1594,6 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
                     ),
                     prefixIcon: const Icon(Icons.event),
                   ),
-                  maxLength: 50,
                 ),
                 const SizedBox(height: 16),
                 TextField(
@@ -1514,7 +1607,6 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
                     prefixIcon: const Icon(Icons.description),
                   ),
                   maxLines: 4,
-                  maxLength: 300,
                 ),
                 const SizedBox(height: 16),
                 TextField(
@@ -1528,7 +1620,6 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
                     prefixIcon: const Icon(Icons.schedule),
                   ),
                   keyboardType: TextInputType.number,
-                  maxLength: 4,
                 ),
                 const SizedBox(height: 16),
                 // Event Visibility Toggle
@@ -1774,6 +1865,7 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
             )
           : null,
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         title: const Text(
           'Explore',
           style: TextStyle(
@@ -2125,8 +2217,9 @@ class _ExploreTabState extends State<ExploreTab> with WidgetsBindingObserver {
                                 Expanded(
                                   child: Center(
                                     child: Dismissible(
-                                      key: ValueKey('profile_${_potentialMatches[_currentIndex]['id']}_$_currentIndex'),
+                                      key: ValueKey('profile_${_potentialMatches[_currentIndex]['id']}'),
                                       direction: DismissDirection.horizontal,
+                                      resizeDuration: null, // Prevents "dismissed widget still in tree" error
                                       onDismissed: (direction) {
                                         if (direction == DismissDirection.endToStart) {
                                           // Swiped left = dislike

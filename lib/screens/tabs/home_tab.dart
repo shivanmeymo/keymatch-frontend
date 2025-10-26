@@ -499,6 +499,7 @@ class _HomeTabState extends State<HomeTab> {
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         title: const Text(
           'KeyMatch',
           style: TextStyle(

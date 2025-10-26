@@ -525,6 +525,7 @@ class _ProfileTabState extends State<ProfileTab> {
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         title: const Text(
           'Profile',
           style: TextStyle(

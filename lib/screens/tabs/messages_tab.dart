@@ -171,6 +171,7 @@ class _MessagesTabState extends State<MessagesTab> {
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         title: const Text(
           'Messages',
           style: TextStyle(
@@ -469,7 +470,14 @@ class _MessagesTabState extends State<MessagesTab> {
                             final pendingMessage = _pendingMessages[index - _matches.length];
                             final profile = pendingMessage['profile'];
                             final userName = '${profile['user']['firstName']} ${profile['user']['lastName']}';
-                            final userProfilePicture = profile['profilePicture'];
+                            
+                            // Get profile picture with full URL (same logic as regular matches)
+                            String? profilePictureUrl;
+                            if (profile['images'] != null && profile['images'].isNotEmpty) {
+                              profilePictureUrl = ProfileService.getFullImageUrl(profile['images'][0]['imageUrl']);
+                            } else if (profile['profilePicture'] != null) {
+                              profilePictureUrl = ProfileService.getFullImageUrl(profile['profilePicture']);
+                            }
 
                             return Card(
                               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -492,10 +500,10 @@ class _MessagesTabState extends State<MessagesTab> {
                                       CircleAvatar(
                                         radius: 25,
                                         backgroundColor: Colors.grey[300],
-                                        backgroundImage: _isValidImageUrl(userProfilePicture)
-                                            ? NetworkImage(userProfilePicture)
+                                        backgroundImage: _isValidImageUrl(profilePictureUrl)
+                                            ? NetworkImage(profilePictureUrl!)
                                             : null,
-                                        child: !_isValidImageUrl(userProfilePicture)
+                                        child: !_isValidImageUrl(profilePictureUrl)
                                             ? const Icon(Icons.person, size: 25, color: Colors.grey)
                                             : null,
                                       ),
@@ -520,55 +528,22 @@ class _MessagesTabState extends State<MessagesTab> {
                                     ],
                                   ),
                                 ),
-                                title: Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        userName,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: Colors.orange,
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                      child: const Text(
-                                        'Pending',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
+                                title: Text(
+                                  userName,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w500,
+                                  ),
                                 ),
-                                subtitle: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      pendingMessage['lastMessage'] != null 
-                                        ? pendingMessage['lastMessage']['content'] ?? 'Premium message sent - waiting for response'
-                                        : 'Premium message sent - waiting for response',
-                                      style: TextStyle(
-                                        color: Colors.grey[600],
-                                        fontWeight: FontWeight.normal,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    Text(
-                                      'Tap to view profile',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.grey[500],
-                                      ),
-                                    ),
-                                  ],
+                                subtitle: Text(
+                                  pendingMessage['lastMessage'] != null 
+                                    ? pendingMessage['lastMessage']['content'] ?? 'Start a conversation!'
+                                    : 'Start a conversation!',
+                                  style: TextStyle(
+                                    color: Colors.grey[200],
+                                    fontWeight: FontWeight.normal,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                                 onTap: () {
                                   // Navigate to detailed profile screen for pending messages

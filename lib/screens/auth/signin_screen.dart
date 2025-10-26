@@ -416,7 +416,7 @@ class _SignInScreenState extends State<SignInScreen> {
                     child: ThemedText(
                       'OR',
                       style: TextStyle(
-                        color: AppColors.textSecondaryLight,
+                        color: Colors.grey[300],
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -467,7 +467,7 @@ class _SignInScreenState extends State<SignInScreen> {
                 child: ThemedText(
                   "Don't have an account? Sign Up",
                   type: ThemedTextType.link,
-                  style: TextStyle(color: colors['tint']),
+                  style: TextStyle(color: Colors.grey[300]),
                 ),
               ),
               TextButton(
@@ -477,7 +477,7 @@ class _SignInScreenState extends State<SignInScreen> {
                 child: ThemedText(
                   "Forgot Password?",
                   type: ThemedTextType.link,
-                  style: TextStyle(color: colors['tint']),
+                  style: TextStyle(color: Colors.grey[300]),
                 ),
               ),
             ],

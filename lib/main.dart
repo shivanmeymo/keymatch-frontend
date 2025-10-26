@@ -138,6 +138,51 @@ class MyApp extends StatelessWidget {
           selectedColor: AppColors.accentGreen,
           labelStyle: const TextStyle(color: AppColors.textPrimaryLight),
         ),
+        datePickerTheme: DatePickerThemeData(
+          backgroundColor: AppColors.primaryGreen,
+          headerBackgroundColor: AppColors.primaryGreen,
+          headerForegroundColor: Colors.white,
+          dayForegroundColor: MaterialStateProperty.resolveWith((states) {
+            if (states.contains(MaterialState.selected)) {
+              return Colors.white;
+            }
+            return Colors.white;
+          }),
+          dayBackgroundColor: MaterialStateProperty.resolveWith((states) {
+            if (states.contains(MaterialState.selected)) {
+              return Colors.white.withOpacity(0.3);
+            }
+            return Colors.transparent;
+          }),
+          todayBackgroundColor: MaterialStateProperty.all(Colors.white.withOpacity(0.2)),
+          todayForegroundColor: MaterialStateProperty.all(Colors.white),
+          confirmButtonStyle: TextButton.styleFrom(
+            foregroundColor: Colors.white,
+          ),
+          cancelButtonStyle: TextButton.styleFrom(
+            foregroundColor: Colors.white,
+          ),
+        ),
+        timePickerTheme: TimePickerThemeData(
+          backgroundColor: AppColors.primaryGreen,
+          dialBackgroundColor: Colors.white.withOpacity(0.2),
+          dialHandColor: Colors.white,
+          dialTextColor: MaterialStateColor.resolveWith((states) {
+            if (states.contains(MaterialState.selected)) {
+              return AppColors.primaryGreen;
+            }
+            return Colors.white;
+          }),
+          hourMinuteTextColor: Colors.white,
+          dayPeriodTextColor: Colors.white,
+          entryModeIconColor: Colors.white,
+          confirmButtonStyle: TextButton.styleFrom(
+            foregroundColor: Colors.white,
+          ),
+          cancelButtonStyle: TextButton.styleFrom(
+            foregroundColor: Colors.white,
+          ),
+        ),
       ),
       darkTheme: ThemeData(
         colorScheme: AppColors.getColorScheme(Brightness.dark),
@@ -457,9 +502,7 @@ class _MainTabScreenState extends State<MainTabScreen> {
         print('=== DEBUG: FCM token registration failed: $e ===');
       });
 
-      // Initialize WebSocket connection for notifications
-      NotificationService.initializeWebSocket();
-      print('=== DEBUG: WebSocket initialized ===');
+      // WebSocket removed - using FCM for push notifications instead
       
       // Set up periodic session refresh
       _setupSessionRefresh();
@@ -482,8 +525,7 @@ class _MainTabScreenState extends State<MainTabScreen> {
 
   @override
   void dispose() {
-    // Disconnect WebSocket when leaving the app
-    NotificationService.disconnect();
+    // WebSocket removed - using FCM for push notifications instead
     super.dispose();
   }
 
